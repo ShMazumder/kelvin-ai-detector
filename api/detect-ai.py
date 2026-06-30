@@ -538,7 +538,7 @@ async def home(request: Request, db: Session = Depends(get_db_session)):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, db: Session = Depends(get_db_session)):
-    return templates.TemplateResponse("login.html", _web_ctx(request, db))
+    return templates.TemplateResponse("login.html", context=_web_ctx(request, db))
 
 
 @app.post("/login")
@@ -564,7 +564,7 @@ async def login_submit(
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request, db: Session = Depends(get_db_session)):
-    return templates.TemplateResponse("register.html", _web_ctx(request, db))
+    return templates.TemplateResponse("register.html", context=_web_ctx(request, db))
 
 
 @app.post("/register")
@@ -619,7 +619,7 @@ async def user_dashboard(request: Request, db: Session = Depends(get_db_session)
     total_requests = db.query(func.count(DetectionLog.id)).filter(
         DetectionLog.user_id == user.id
     ).scalar()
-    return templates.TemplateResponse("user/dashboard.html", _web_ctx(
+    return templates.TemplateResponse("user/dashboard.html", context=_web_ctx(
         request, db, recent_logs=recent_logs, total_requests=total_requests,
     ))
 
@@ -627,7 +627,7 @@ async def user_dashboard(request: Request, db: Session = Depends(get_db_session)
 @app.get("/dashboard/detect", response_class=HTMLResponse)
 async def user_detect_page(request: Request, db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
-    return templates.TemplateResponse("user/detect.html", _web_ctx(request, db))
+    return templates.TemplateResponse("user/detect.html", context=_web_ctx(request, db))
 
 
 @app.post("/dashboard/detect")
@@ -639,12 +639,12 @@ async def user_detect_submit(
     user = _require_web_user(request, db)
 
     if len(text.strip()) < TEXT_MIN_LENGTH:
-        return templates.TemplateResponse("user/detect.html", _web_ctx(
+        return templates.TemplateResponse("user/detect.html", context=_web_ctx(
             request, db, error=f"Text too short (min {TEXT_MIN_LENGTH} chars).",
         ))
 
     if user.balance < COST_PER_DETECTION:
-        return templates.TemplateResponse("user/detect.html", _web_ctx(
+        return templates.TemplateResponse("user/detect.html", context=_web_ctx(
             request, db, error="Insufficient balance.",
         ))
 
@@ -660,7 +660,12 @@ async def user_detect_submit(
 
     result = _do_detect(text, key_info, db, request.client.host if request.client else None)
 
-    return templates.TemplateResponse("user/detect.html", _web_ctx(
+    # Return JSON for AJAX requests (chat UI), HTML for fallback
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept:
+        return JSONResponse(result)
+
+    return templates.TemplateResponse("user/detect.html", context=_web_ctx(
         request, db, result=result, input_text=text,
     ))
 
@@ -674,7 +679,7 @@ async def user_keys_page(request: Request, db: Session = Depends(get_db_session)
         .order_by(desc(APIKeyRecord.created_at))
         .all()
     )
-    return templates.TemplateResponse("user/keys.html", _web_ctx(request, db, keys=keys))
+    return templates.TemplateResponse("user/keys.html", context=_web_ctx(request, db, keys=keys))
 
 
 @app.post("/dashboard/keys/create")
@@ -691,7 +696,7 @@ async def user_create_key(
         .order_by(desc(APIKeyRecord.created_at))
         .all()
     )
-    return templates.TemplateResponse("user/keys.html", _web_ctx(
+    return templates.TemplateResponse("user/keys.html", context=_web_ctx(
         request, db, keys=keys, new_key=raw_key,
     ))
 
@@ -721,7 +726,7 @@ async def user_usage_page(request: Request, db: Session = Depends(get_db_session
     total_cost = db.query(func.sum(DetectionLog.cost)).filter(
         DetectionLog.user_id == user.id
     ).scalar() or 0
-    return templates.TemplateResponse("user/usage.html", _web_ctx(
+    return templates.TemplateResponse("user/usage.html", context=_web_ctx(
         request, db, logs=logs, total=total, total_cost=total_cost,
     ))
 
@@ -736,7 +741,7 @@ async def user_topup_page(request: Request, db: Session = Depends(get_db_session
         .limit(50)
         .all()
     )
-    return templates.TemplateResponse("user/topup.html", _web_ctx(
+    return templates.TemplateResponse("user/topup.html", context=_web_ctx(
         request, db, transactions=transactions,
     ))
 
@@ -769,7 +774,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db_session
         u = db.query(User).filter(User.id == log.user_id).first()
         log.user_email = u.email if u else "unknown"
 
-    return templates.TemplateResponse("admin/dashboard.html", _web_ctx(
+    return templates.TemplateResponse("admin/dashboard.html", context=_web_ctx(
         request, db,
         total_users=total_users, total_requests=total_requests,
         active_keys=active_keys, total_credits=total_credits,
@@ -781,7 +786,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db_session
 async def admin_users_page(request: Request, db: Session = Depends(get_db_session)):
     _require_admin_web(request, db)
     users = db.query(User).order_by(desc(User.created_at)).all()
-    return templates.TemplateResponse("admin/users.html", _web_ctx(request, db, users=users))
+    return templates.TemplateResponse("admin/users.html", context=_web_ctx(request, db, users=users))
 
 
 @app.post("/admin/users/{user_id}/topup")
@@ -814,7 +819,7 @@ async def admin_keys_page(request: Request, db: Session = Depends(get_db_session
     for k in keys:
         u = db.query(User).filter(User.id == k.user_id).first()
         k.user_email = u.email if u else "unknown"
-    return templates.TemplateResponse("admin/keys.html", _web_ctx(request, db, keys=keys))
+    return templates.TemplateResponse("admin/keys.html", context=_web_ctx(request, db, keys=keys))
 
 
 @app.post("/admin/keys/{key_id}/rate-limit")
@@ -850,7 +855,7 @@ async def admin_logs_page(request: Request, db: Session = Depends(get_db_session
     for log in logs:
         u = db.query(User).filter(User.id == log.user_id).first()
         log.user_email = u.email if u else "unknown"
-    return templates.TemplateResponse("admin/logs.html", _web_ctx(request, db, logs=logs))
+    return templates.TemplateResponse("admin/logs.html", context=_web_ctx(request, db, logs=logs))
 
 
 # ── Run ────────────────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
@@ -25,17 +25,15 @@ ACCESS_TOKEN_EXPIRE_HOURS = 24
 DEFAULT_BALANCE = 100.0
 DEFAULT_RATE_LIMIT = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 # ── Password hashing ──────────────────────────────────────────────────────────
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 # ── API key hashing ───────────────────────────────────────────────────────────
