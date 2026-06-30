@@ -512,19 +512,18 @@ async def admin_stats(
     }
 
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 # WEB UI ROUTES
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _web_ctx(request: Request, db: Session, **extra):
-    """Build template context with current user."""
+def _render(request: Request, db: Session, template: str, **extra):
+    """Render template with user context. Starlette 1.0 compatible."""
     user = get_current_web_user(request, db)
-    ctx = {"request": request, "user": user}
+    ctx = {"user": user}
     ctx.update(extra)
-    return ctx
+    return templates.TemplateResponse(request, template, context=ctx)
 
-
-# ── Public pages ───────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db_session)):
@@ -538,52 +537,33 @@ async def home(request: Request, db: Session = Depends(get_db_session)):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, db: Session = Depends(get_db_session)):
-    return templates.TemplateResponse("login.html", context=_web_ctx(request, db))
+    return _render(request, db, "login.html")
 
 
 @app.post("/login")
-async def login_submit(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db_session),
-):
+async def login_submit(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db_session)):
     user = auth.authenticate_user(db, email, password)
     if not user:
-        return templates.TemplateResponse(
-            "login.html", _web_ctx(request, db, error="Invalid credentials.")
-        )
+        return _render(request, db, "login.html", error="Invalid credentials.")
     token = auth.create_access_token(user.id, user.role)
-    if user.role == "admin":
-        response = RedirectResponse("/admin/dashboard", status_code=302)
-    else:
-        response = RedirectResponse("/dashboard", status_code=302)
+    dest = "/admin/dashboard" if user.role == "admin" else "/dashboard"
+    response = RedirectResponse(dest, status_code=302)
     response.set_cookie("session_token", token, httponly=True, max_age=86400)
     return response
 
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request, db: Session = Depends(get_db_session)):
-    return templates.TemplateResponse("register.html", context=_web_ctx(request, db))
+    return _render(request, db, "register.html")
 
 
 @app.post("/register")
-async def register_submit(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    display_name: str = Form(...),
-    db: Session = Depends(get_db_session),
-):
+async def register_submit(request: Request, email: str = Form(...), password: str = Form(...), display_name: str = Form(...), db: Session = Depends(get_db_session)):
     if len(password) < 6:
-        return templates.TemplateResponse(
-            "register.html", _web_ctx(request, db, error="Password must be at least 6 characters.")
-        )
+        return _render(request, db, "register.html", error="Password must be at least 6 characters.")
     user = auth.register_user(db, email, password, display_name)
     if not user:
-        return templates.TemplateResponse(
-            "register.html", _web_ctx(request, db, error="Email already registered.")
-        )
+        return _render(request, db, "register.html", error="Email already registered.")
     token = auth.create_access_token(user.id, user.role)
     response = RedirectResponse("/dashboard", status_code=302)
     response.set_cookie("session_token", token, httponly=True, max_age=86400)
@@ -597,8 +577,6 @@ async def logout():
     return response
 
 
-# ── User dashboard ─────────────────────────────────────────────────────────────
-
 def _require_web_user(request: Request, db: Session) -> User:
     user = get_current_web_user(request, db)
     if not user:
@@ -609,102 +587,49 @@ def _require_web_user(request: Request, db: Session) -> User:
 @app.get("/dashboard", response_class=HTMLResponse)
 async def user_dashboard(request: Request, db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
-    recent_logs = (
-        db.query(DetectionLog)
-        .filter(DetectionLog.user_id == user.id)
-        .order_by(desc(DetectionLog.created_at))
-        .limit(10)
-        .all()
-    )
-    total_requests = db.query(func.count(DetectionLog.id)).filter(
-        DetectionLog.user_id == user.id
-    ).scalar()
-    return templates.TemplateResponse("user/dashboard.html", context=_web_ctx(
-        request, db, recent_logs=recent_logs, total_requests=total_requests,
-    ))
+    recent_logs = db.query(DetectionLog).filter(DetectionLog.user_id == user.id).order_by(desc(DetectionLog.created_at)).limit(10).all()
+    total_requests = db.query(func.count(DetectionLog.id)).filter(DetectionLog.user_id == user.id).scalar()
+    return _render(request, db, "user/dashboard.html", recent_logs=recent_logs, total_requests=total_requests)
 
 
 @app.get("/dashboard/detect", response_class=HTMLResponse)
 async def user_detect_page(request: Request, db: Session = Depends(get_db_session)):
-    user = _require_web_user(request, db)
-    return templates.TemplateResponse("user/detect.html", context=_web_ctx(request, db))
+    _require_web_user(request, db)
+    return _render(request, db, "user/detect.html")
 
 
 @app.post("/dashboard/detect")
-async def user_detect_submit(
-    request: Request,
-    text: str = Form(...),
-    db: Session = Depends(get_db_session),
-):
+async def user_detect_submit(request: Request, text: str = Form(...), db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
-
     if len(text.strip()) < TEXT_MIN_LENGTH:
-        return templates.TemplateResponse("user/detect.html", context=_web_ctx(
-            request, db, error=f"Text too short (min {TEXT_MIN_LENGTH} chars).",
-        ))
-
+        return _render(request, db, "user/detect.html", error=f"Text too short (min {TEXT_MIN_LENGTH} chars).")
     if user.balance < COST_PER_DETECTION:
-        return templates.TemplateResponse("user/detect.html", context=_web_ctx(
-            request, db, error="Insufficient balance.",
-        ))
-
-    # Build a fake key_info for _do_detect
-    key_info = {
-        "user_id": user.id,
-        "key_id": None,
-        "key_hash": "web_ui",
-        "role": user.role,
-        "balance": user.balance,
-        "rate_limit": 9999,
-    }
-
+        return _render(request, db, "user/detect.html", error="Insufficient balance.")
+    key_info = {"user_id": user.id, "key_id": None, "key_hash": "web_ui", "role": user.role, "balance": user.balance, "rate_limit": 9999}
     result = _do_detect(text, key_info, db, request.client.host if request.client else None)
-
-    # Return JSON for AJAX requests (chat UI), HTML for fallback
     accept = request.headers.get("accept", "")
     if "application/json" in accept:
         return JSONResponse(result)
-
-    return templates.TemplateResponse("user/detect.html", context=_web_ctx(
-        request, db, result=result, input_text=text,
-    ))
+    return _render(request, db, "user/detect.html", result=result, input_text=text)
 
 
 @app.get("/dashboard/keys", response_class=HTMLResponse)
 async def user_keys_page(request: Request, db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
-    keys = (
-        db.query(APIKeyRecord)
-        .filter(APIKeyRecord.user_id == user.id)
-        .order_by(desc(APIKeyRecord.created_at))
-        .all()
-    )
-    return templates.TemplateResponse("user/keys.html", context=_web_ctx(request, db, keys=keys))
+    keys = db.query(APIKeyRecord).filter(APIKeyRecord.user_id == user.id).order_by(desc(APIKeyRecord.created_at)).all()
+    return _render(request, db, "user/keys.html", keys=keys)
 
 
 @app.post("/dashboard/keys/create")
-async def user_create_key(
-    request: Request,
-    label: str = Form(...),
-    db: Session = Depends(get_db_session),
-):
+async def user_create_key(request: Request, label: str = Form(...), db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
     raw_key = auth.create_api_key(db, user.id, label)
-    keys = (
-        db.query(APIKeyRecord)
-        .filter(APIKeyRecord.user_id == user.id)
-        .order_by(desc(APIKeyRecord.created_at))
-        .all()
-    )
-    return templates.TemplateResponse("user/keys.html", context=_web_ctx(
-        request, db, keys=keys, new_key=raw_key,
-    ))
+    keys = db.query(APIKeyRecord).filter(APIKeyRecord.user_id == user.id).order_by(desc(APIKeyRecord.created_at)).all()
+    return _render(request, db, "user/keys.html", keys=keys, new_key=raw_key)
 
 
 @app.post("/dashboard/keys/{key_id}/delete")
-async def user_delete_key(
-    key_id: int, request: Request, db: Session = Depends(get_db_session),
-):
+async def user_delete_key(key_id: int, request: Request, db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
     auth.revoke_api_key(db, key_id, user.id)
     return RedirectResponse("/dashboard/keys", status_code=302)
@@ -713,40 +638,18 @@ async def user_delete_key(
 @app.get("/dashboard/usage", response_class=HTMLResponse)
 async def user_usage_page(request: Request, db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
-    logs = (
-        db.query(DetectionLog)
-        .filter(DetectionLog.user_id == user.id)
-        .order_by(desc(DetectionLog.created_at))
-        .limit(100)
-        .all()
-    )
-    total = db.query(func.count(DetectionLog.id)).filter(
-        DetectionLog.user_id == user.id
-    ).scalar()
-    total_cost = db.query(func.sum(DetectionLog.cost)).filter(
-        DetectionLog.user_id == user.id
-    ).scalar() or 0
-    return templates.TemplateResponse("user/usage.html", context=_web_ctx(
-        request, db, logs=logs, total=total, total_cost=total_cost,
-    ))
+    logs = db.query(DetectionLog).filter(DetectionLog.user_id == user.id).order_by(desc(DetectionLog.created_at)).limit(100).all()
+    total = db.query(func.count(DetectionLog.id)).filter(DetectionLog.user_id == user.id).scalar()
+    total_cost = db.query(func.sum(DetectionLog.cost)).filter(DetectionLog.user_id == user.id).scalar() or 0
+    return _render(request, db, "user/usage.html", logs=logs, total=total, total_cost=total_cost)
 
 
 @app.get("/dashboard/topup", response_class=HTMLResponse)
 async def user_topup_page(request: Request, db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)
-    transactions = (
-        db.query(BalanceTransaction)
-        .filter(BalanceTransaction.user_id == user.id)
-        .order_by(desc(BalanceTransaction.created_at))
-        .limit(50)
-        .all()
-    )
-    return templates.TemplateResponse("user/topup.html", context=_web_ctx(
-        request, db, transactions=transactions,
-    ))
+    transactions = db.query(BalanceTransaction).filter(BalanceTransaction.user_id == user.id).order_by(desc(BalanceTransaction.created_at)).limit(50).all()
+    return _render(request, db, "user/topup.html", transactions=transactions)
 
-
-# ── Admin dashboard ────────────────────────────────────────────────────────────
 
 def _require_admin_web(request: Request, db: Session) -> User:
     user = get_current_web_user(request, db)
@@ -762,48 +665,31 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db_session
     _require_admin_web(request, db)
     total_users = db.query(func.count(User.id)).scalar()
     total_requests = db.query(func.count(DetectionLog.id)).scalar()
-    active_keys = db.query(func.count(APIKeyRecord.id)).filter(
-        APIKeyRecord.is_revoked == False
-    ).scalar()
+    active_keys = db.query(func.count(APIKeyRecord.id)).filter(APIKeyRecord.is_revoked == False).scalar()
     total_credits = db.query(func.sum(DetectionLog.cost)).scalar() or 0
-    recent_logs = (
-        db.query(DetectionLog).order_by(desc(DetectionLog.created_at)).limit(10).all()
-    )
-    # Enrich logs with user email
+    recent_logs = db.query(DetectionLog).order_by(desc(DetectionLog.created_at)).limit(10).all()
     for log in recent_logs:
         u = db.query(User).filter(User.id == log.user_id).first()
         log.user_email = u.email if u else "unknown"
-
-    return templates.TemplateResponse("admin/dashboard.html", context=_web_ctx(
-        request, db,
-        total_users=total_users, total_requests=total_requests,
-        active_keys=active_keys, total_credits=total_credits,
-        recent_logs=recent_logs,
-    ))
+    return _render(request, db, "admin/dashboard.html", total_users=total_users, total_requests=total_requests, active_keys=active_keys, total_credits=total_credits, recent_logs=recent_logs)
 
 
 @app.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_page(request: Request, db: Session = Depends(get_db_session)):
     _require_admin_web(request, db)
     users = db.query(User).order_by(desc(User.created_at)).all()
-    return templates.TemplateResponse("admin/users.html", context=_web_ctx(request, db, users=users))
+    return _render(request, db, "admin/users.html", users=users)
 
 
 @app.post("/admin/users/{user_id}/topup")
-async def admin_topup_web(
-    user_id: int, request: Request,
-    amount: float = Form(...),
-    db: Session = Depends(get_db_session),
-):
+async def admin_topup_web(user_id: int, request: Request, amount: float = Form(...), db: Session = Depends(get_db_session)):
     _require_admin_web(request, db)
     auth.topup_balance(db, user_id, amount, "Admin top-up via dashboard")
     return RedirectResponse("/admin/users", status_code=302)
 
 
 @app.post("/admin/users/{user_id}/toggle")
-async def admin_toggle_web(
-    user_id: int, request: Request, db: Session = Depends(get_db_session),
-):
+async def admin_toggle_web(user_id: int, request: Request, db: Session = Depends(get_db_session)):
     admin = _require_admin_web(request, db)
     user = db.query(User).filter(User.id == user_id).first()
     if user and user.id != admin.id:
@@ -819,15 +705,11 @@ async def admin_keys_page(request: Request, db: Session = Depends(get_db_session
     for k in keys:
         u = db.query(User).filter(User.id == k.user_id).first()
         k.user_email = u.email if u else "unknown"
-    return templates.TemplateResponse("admin/keys.html", context=_web_ctx(request, db, keys=keys))
+    return _render(request, db, "admin/keys.html", keys=keys)
 
 
 @app.post("/admin/keys/{key_id}/rate-limit")
-async def admin_rate_limit_web(
-    key_id: int, request: Request,
-    rate_limit: int = Form(...),
-    db: Session = Depends(get_db_session),
-):
+async def admin_rate_limit_web(key_id: int, request: Request, rate_limit: int = Form(...), db: Session = Depends(get_db_session)):
     _require_admin_web(request, db)
     record = db.query(APIKeyRecord).filter(APIKeyRecord.id == key_id).first()
     if record:
@@ -837,9 +719,7 @@ async def admin_rate_limit_web(
 
 
 @app.post("/admin/keys/{key_id}/revoke")
-async def admin_revoke_web(
-    key_id: int, request: Request, db: Session = Depends(get_db_session),
-):
+async def admin_revoke_web(key_id: int, request: Request, db: Session = Depends(get_db_session)):
     _require_admin_web(request, db)
     record = db.query(APIKeyRecord).filter(APIKeyRecord.id == key_id).first()
     if record:
@@ -855,14 +735,11 @@ async def admin_logs_page(request: Request, db: Session = Depends(get_db_session
     for log in logs:
         u = db.query(User).filter(User.id == log.user_id).first()
         log.user_email = u.email if u else "unknown"
-    return templates.TemplateResponse("admin/logs.html", context=_web_ctx(request, db, logs=logs))
+    return _render(request, db, "admin/logs.html", logs=logs)
 
-
-# ── Run ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn
-
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
     logger.info(f"Starting Kelvin AI Detector on {host}:{port}")

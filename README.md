@@ -1,173 +1,203 @@
 # Kelvin AI Text Detector
 
-Detect AI-generated text using heuristic pattern analysis and optional ML classification. Full-stack application with REST API, admin panel, and user dashboard.
+A full-stack AI-generated text detection system with a REST API, admin panel, and user dashboard. Uses heuristic pattern matching with optional ML model support.
 
 ## Features
 
-- **14 Heuristic Pattern Detectors** — vocabulary, inflated significance, em-dash overuse, rule-of-three, burstiness, lexical diversity, and more
-- **Optional ML Classifier** — TF-IDF + Logistic Regression, loads automatically when trained model files exist
-- **REST API** — single and batch text detection with JSON responses
-- **Web Dashboard** — chat-style detection UI, usage history, API key management
-- **Admin Panel** — user management, balance top-up, rate limit control, detection logs
-- **Balance System** — credit-based usage tracking (1 credit per detection)
-- **API Key Auth** — SHA-256 hashed keys with per-key rate limiting
-- **SQLite Database** — zero-config, stores users, keys, logs, transactions
+### Detection Engine
+- **Heuristic Analysis** — Pattern matching for 50+ AI writing markers (filler phrases, hedging, overused transitions, vocabulary uniformity, sentence rhythm)
+- **Optional ML Layer** — Loads a trained classifier if model files are present; gracefully falls back to heuristic-only mode
+- **Scoring** — 0-100 AI probability score with verdicts: *Likely Human*, *Possibly AI-assisted*, *Likely AI-generated*
+
+### REST API
+- `POST /api/detect` — Single text detection
+- `POST /api/detect/batch` — Batch detection (up to 20 texts)
+- `GET /api/balance` — Check credit balance
+- `GET /api/usage` — Usage history
+- `POST /api/keys` — Create API keys
+- `DELETE /api/keys/{id}` — Revoke keys
+- **Admin endpoints** — User management, key management, logs, stats
+
+### Web Dashboard
+- **User Panel** — AI text detection chat UI, API key management, usage stats, balance top-up
+- **Admin Panel** — User management, global API key management, detection logs, system stats
+- **Auth** — Registration, login, JWT sessions via secure HTTP-only cookies
+
+### Balance & Rate Limiting
+- Credit-based billing (1 credit per detection)
+- Per-key rate limiting (configurable per key)
+- New users get 100 free credits
+
+---
 
 ## Quick Start
 
+### Prerequisites
+- Python 3.10+
+- pip
+
+### Install & Run
+
 ```bash
-# Install dependencies
 cd api
 pip install -r requirements.txt
-
-# Start server
 python detect-ai.py
 ```
 
-On first run, default admin credentials are printed to console:
-```
-Email:    admin@kelvin.local
-Password: admin123
-API Key:  kad_...
-```
+Server starts at **http://localhost:8000**
 
-> ⚠️ **Change these in production!** Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables before first run.
+### First Run
 
-Open `http://localhost:8000` in your browser.
+On first startup, a default admin account is created:
 
-## API Endpoints
+| Field    | Value              |
+|----------|--------------------|
+| Email    | admin@kelvin.local |
+| Password | admin123           |
+| API Key  | (shown in logs)    |
 
-### Public
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check + model status |
+> ⚠️ **Change these credentials in production!**
 
-### Auth (no key required)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/auth/register` | POST | Register new user |
-| `/api/auth/login` | POST | Login → JWT token |
+---
 
-### Detection (API key required via `X-API-Key` header)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/detect` | POST | Analyze single text |
-| `/api/detect/batch` | POST | Analyze up to 20 texts |
-| `/api/balance` | GET | Check balance |
-| `/api/usage` | GET | Usage history |
-| `/api/keys` | GET/POST | List/create own keys |
-| `/api/keys/{id}` | DELETE | Revoke own key |
+## API Usage
 
-### Admin (admin API key required)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/admin/users` | GET | List all users |
-| `/api/admin/users/{id}/topup` | POST | Top up user balance |
-| `/api/admin/users/{id}/toggle` | PUT | Enable/disable user |
-| `/api/admin/keys` | GET | List all API keys |
-| `/api/admin/keys/{id}/rate-limit` | PUT | Set rate limit |
-| `/api/admin/logs` | GET | View detection logs |
-| `/api/admin/stats` | GET | System statistics |
-
-## API Usage Example
+### Detect AI Text
 
 ```bash
-# Detect AI text
 curl -X POST http://localhost:8000/api/detect \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_KEY" \
   -d '{"text": "Your text to analyze here..."}'
 ```
 
-Response:
+**Response:**
 ```json
 {
-  "final_score": 36.0,
-  "final_verdict": "Possibly AI-assisted / mixed",
+  "final_score": 72.5,
+  "final_verdict": "Likely AI-generated",
   "model_used": "heuristic",
-  "detected_patterns": {
-    "ai_vocabulary": 13.83,
-    "leftover_chat_artifacts": 10.02
-  },
-  "pattern_examples": {
-    "ai_vocabulary": ["landscape", "pivotal", "robust"],
-    "leftover_chat_artifacts": ["I hope this helps"]
-  },
+  "word_count": 150,
+  "sentence_count": 8,
   "remaining_balance": 99.0,
-  "disclaimer": "Style diagnostic only — not proof of authorship."
+  "heuristic": {
+    "score": 72.5,
+    "flags": ["filler_phrases", "hedging_language"],
+    "details": { ... }
+  }
 }
 ```
 
-## Adding ML Model
-
-Train and export a classifier for improved accuracy:
+### Register User
 
 ```bash
-# With labeled data (CSV with 'text' + 'generated' columns):
-python api/export_model.py /path/to/train_essays.csv
-
-# Restart server — model auto-loads
-python api/detect-ai.py
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "secret123", "display_name": "Test"}'
 ```
+
+### Batch Detection
+
+```bash
+curl -X POST http://localhost:8000/api/detect/batch \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_KEY" \
+  -d '{"texts": ["Text one...", "Text two..."]}'
+```
+
+---
 
 ## Project Structure
 
 ```
 kelvin-ai-detector/
-├── README.md
 ├── api/
-│   ├── detect-ai.py          # FastAPI server
-│   ├── detector.py            # Core detection logic
-│   ├── database.py            # SQLAlchemy models
-│   ├── auth.py                # Authentication
-│   ├── export_model.py        # ML model trainer
-│   ├── requirements.txt
-│   ├── data/kelvin.db         # SQLite (auto-created)
-│   ├── model/                 # ML model files (optional)
+│   ├── detect-ai.py       # FastAPI server (API + Web routes)
+│   ├── detector.py         # Detection logic (heuristic + ML)
+│   ├── auth.py             # Auth, JWT, API key management
+│   ├── database.py         # SQLAlchemy models (SQLite)
+│   ├── requirements.txt    # Python dependencies
 │   ├── static/
-│   │   ├── css/style.css
-│   │   └── js/app.js
-│   └── templates/
-│       ├── base.html
-│       ├── login.html
-│       ├── register.html
-│       ├── admin/             # Admin panel pages
-│       └── user/              # User dashboard pages
-└── detectors/
-    └── ai_text_likeness_detector.ipynb  # Original notebook
+│   │   ├── css/style.css   # Dark theme design system
+│   │   └── js/app.js       # Client-side detection UI
+│   ├── templates/
+│   │   ├── base.html       # Base layout with sidebar
+│   │   ├── login.html      # Login page
+│   │   ├── register.html   # Registration page
+│   │   ├── user/           # User dashboard templates
+│   │   │   ├── dashboard.html
+│   │   │   ├── detect.html
+│   │   │   ├── keys.html
+│   │   │   ├── usage.html
+│   │   │   └── topup.html
+│   │   └── admin/          # Admin panel templates
+│   │       ├── dashboard.html
+│   │       ├── users.html
+│   │       ├── keys.html
+│   │       └── logs.html
+│   └── data/               # SQLite database (auto-created)
+├── detectors/              # Legacy detector scripts
+└── generators/             # Test text generators
 ```
+
+---
+
+## Tech Stack
+
+| Layer      | Technology                    |
+|------------|-------------------------------|
+| Backend    | FastAPI + Uvicorn             |
+| Database   | SQLite via SQLAlchemy 2.0     |
+| Auth       | bcrypt + python-jose (JWT)    |
+| Templates  | Jinja2                        |
+| Frontend   | Vanilla JS + CSS (dark theme) |
+
+---
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8000` | Server port |
-| `HOST` | `0.0.0.0` | Server host |
-| `SECRET_KEY` | (random) | JWT signing key |
-| `ADMIN_EMAIL` | `admin@kelvin.local` | Default admin email |
-| `ADMIN_PASSWORD` | `admin123` | Default admin password |
+| Variable     | Default         | Description                 |
+|--------------|-----------------|-----------------------------|
+| `PORT`       | `8000`          | Server port                 |
+| `HOST`       | `0.0.0.0`       | Bind address                |
+| `SECRET_KEY` | Auto-generated  | JWT signing key             |
+| `ADMIN_EMAIL`| `admin@kelvin.local` | Default admin email    |
+| `ADMIN_PASS` | `admin123`      | Default admin password      |
 
-## Detection Patterns
+---
 
-| Pattern | Weight | Description |
-|---------|--------|-------------|
-| AI Vocabulary | 14 | Words like "delve", "robust", "seamless" |
-| Leftover Chat Artifacts | 14 | "I hope this helps", "Happy to help" |
-| Inflated Significance | 10 | "plays a pivotal role" |
-| Negative Parallelism | 10 | "It's not just X, it's Y" |
-| Em Dash Overuse | 8 | Excessive — use of em dashes |
-| Rule of Three | 8 | "X, Y, and Z" triplet lists |
-| Compulsive Summary | 8 | "In summary", "In conclusion" |
-| Editorializing | 8 | "It's important to note" |
-| Vague Attribution | 8 | "Experts say", "Many believe" |
-| False Ranges | 8 | "From X to Y" constructions |
-| Formatting Overkill | 6 | Excessive bold/bullets/emoji |
-| Letter Style | 6 | "I hope this email finds you well" |
-| Low Sentence Variance | 6 | Uniform sentence lengths |
+## API Endpoints
 
-## Disclaimer
+### Public
+| Method | Endpoint             | Description          |
+|--------|----------------------|----------------------|
+| POST   | `/api/auth/register` | Register new user    |
+| POST   | `/api/auth/login`    | Login, get JWT       |
+| GET    | `/api/health`        | Health check         |
 
-This is a **style diagnostic tool**, not proof of authorship. AI text detectors produce both false positives and false negatives. Treat results as discussion points, not verdicts.
+### Authenticated (X-API-Key)
+| Method | Endpoint              | Description          |
+|--------|-----------------------|----------------------|
+| POST   | `/api/detect`         | Detect AI text       |
+| POST   | `/api/detect/batch`   | Batch detection      |
+| GET    | `/api/balance`        | Check balance        |
+| GET    | `/api/usage`          | Usage history        |
+| POST   | `/api/keys`           | Create API key       |
+| DELETE | `/api/keys/{id}`      | Revoke own key       |
+
+### Admin (X-API-Key with admin role)
+| Method | Endpoint                          | Description          |
+|--------|-----------------------------------|----------------------|
+| GET    | `/api/admin/users`                | List all users       |
+| POST   | `/api/admin/users/{id}/topup`     | Add credits          |
+| PUT    | `/api/admin/users/{id}/toggle`    | Enable/disable user  |
+| GET    | `/api/admin/keys`                 | List all API keys    |
+| PUT    | `/api/admin/keys/{id}/rate-limit` | Set rate limit       |
+| DELETE | `/api/admin/keys/{id}`            | Revoke any key       |
+| GET    | `/api/admin/logs`                 | Detection logs       |
+| GET    | `/api/admin/stats`                | System statistics    |
+
+---
 
 ## License
 
