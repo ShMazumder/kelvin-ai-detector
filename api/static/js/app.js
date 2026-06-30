@@ -87,7 +87,7 @@ function initChatDetect() {
             }
 
             const result = await resp.json();
-            addResultBubble(result);
+            addResultBubble(result, text);
 
             // Update balance display
             const balEl = document.getElementById('balance-display');
@@ -140,10 +140,10 @@ function addSystemMessage(text, isError = false) {
     div.scrollTop = div.scrollHeight;
 }
 
-function addResultBubble(result) {
+function addResultBubble(result, originalText) {
     const div = document.getElementById('chat-messages');
     const bubble = document.createElement('div');
-    bubble.className = 'chat-bubble system';
+    bubble.className = 'chat-bubble system result-bubble-wide';
 
     const score = result.final_score;
     const scoreClass = getScoreClass(score);
@@ -155,7 +155,7 @@ function addResultBubble(result) {
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (score / 100) * circumference;
 
-    const verdictIcon = score >= 60 ? '🤖' : score >= 30 ? '⚠️' : '✅';
+    const verdictIcon = score >= 55 ? '🤖' : score >= 25 ? '⚠️' : '✅';
     const verdictText = result.final_verdict || 'Unknown';
 
     // Build patterns HTML with progress bars
@@ -167,21 +167,16 @@ function addResultBubble(result) {
             const label = name.replace(/_/g, ' ');
             const barPct = Math.min((pts / 20) * 100, 100);
             const barClass = pts >= 10 ? 'bar-high' : pts >= 5 ? 'bar-mid' : 'bar-low';
-            const exList = examples[name];
-            let exHtml = '';
-            if (exList && exList.length > 0) {
-                exHtml = `<div class="pattern-examples-inline">${exList.slice(0, 3).map(e => '"' + escapeHtml(e) + '"').join(', ')}</div>`;
-            }
+            const color = PATTERN_COLORS[name] || PATTERN_COLORS._default;
             patternsHtml += `
                 <div class="pattern-bar-item">
                     <div class="pattern-bar-header">
-                        <span class="pattern-bar-name">${label}</span>
+                        <span class="pattern-bar-name"><span class="pattern-color-dot" style="background:${color}"></span>${label}</span>
                         <span class="pattern-bar-score">${pts.toFixed(1)} pts</span>
                     </div>
                     <div class="pattern-bar-track">
-                        <div class="pattern-bar-fill ${barClass}" style="width: 0%;" data-width="${barPct}%"></div>
+                        <div class="pattern-bar-fill" style="width: 0%; background:${color}" data-width="${barPct}%"></div>
                     </div>
-                    ${exHtml}
                 </div>
             `;
         }
@@ -190,7 +185,10 @@ function addResultBubble(result) {
         patternsHtml = '<div class="no-patterns">No AI patterns detected</div>';
     }
 
-    // Compose full result summary for copy
+    // Build highlighted text
+    const highlightedHtml = buildHighlightedText(originalText || '', examples, patterns);
+
+    // Compose copy text
     const copyText = `AI Detection Score: ${score}/100 — ${verdictText}\n` +
         `Model: ${result.model_used} | Words: ${result.word_count} | Time: ${result.processing_time_ms}ms\n` +
         (sortedPatterns.length > 0 ? `Patterns: ${sortedPatterns.map(([n, s]) => `${n.replace(/_/g, ' ')} (${s.toFixed(1)}pts)`).join(', ')}` : 'No AI patterns detected');
@@ -206,45 +204,55 @@ function addResultBubble(result) {
                 </div>
             </div>
 
-            <div class="gauge-wrapper">
-                <svg class="gauge-svg" viewBox="0 0 120 120">
-                    <circle class="gauge-bg" cx="60" cy="60" r="${radius}"/>
-                    <circle class="gauge-fill ${scoreClass}" cx="60" cy="60" r="${radius}"
-                        stroke-dasharray="${circumference}"
-                        stroke-dashoffset="${circumference}"
-                        data-target="${offset}"/>
-                </svg>
-                <div class="gauge-label">
-                    <div class="gauge-score ${scoreClass}">${score}</div>
-                    <div class="gauge-max">/ 100</div>
+            <div class="result-two-col">
+                <!-- Left: Score & Patterns -->
+                <div class="result-col-score">
+                    <div class="gauge-wrapper">
+                        <svg class="gauge-svg" viewBox="0 0 120 120">
+                            <circle class="gauge-bg" cx="60" cy="60" r="${radius}"/>
+                            <circle class="gauge-fill ${scoreClass}" cx="60" cy="60" r="${radius}"
+                                stroke-dasharray="${circumference}"
+                                stroke-dashoffset="${circumference}"
+                                data-target="${offset}"/>
+                        </svg>
+                        <div class="gauge-label">
+                            <div class="gauge-score ${scoreClass}">${score}</div>
+                            <div class="gauge-max">/ 100</div>
+                        </div>
+                    </div>
+
+                    <div class="verdict-badge ${scoreClass}">
+                        <span class="verdict-icon">${verdictIcon}</span>
+                        ${verdictText}
+                    </div>
+
+                    <div class="result-stats">
+                        <div class="result-stat">
+                            <div class="result-stat-value">${result.word_count}</div>
+                            <div class="result-stat-label">Words</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-value">${result.sentence_count || '—'}</div>
+                            <div class="result-stat-label">Sentences</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="result-stat-value">${result.processing_time_ms}ms</div>
+                            <div class="result-stat-label">Speed</div>
+                        </div>
+                    </div>
+
+                    ${patternsHtml}
+                </div>
+
+                <!-- Right: Highlighted Text -->
+                <div class="result-col-text">
+                    <div class="highlighted-text-header">
+                        <span class="highlighted-text-title">Your Text — Highlighted</span>
+                    </div>
+                    <div class="highlighted-text-body">${highlightedHtml}</div>
+                    <div class="highlight-legend">${buildLegendHtml(examples, patterns)}</div>
                 </div>
             </div>
-
-            <div class="verdict-badge ${scoreClass}">
-                <span class="verdict-icon">${verdictIcon}</span>
-                ${verdictText}
-            </div>
-
-            <div class="result-stats">
-                <div class="result-stat">
-                    <div class="result-stat-value">${result.word_count}</div>
-                    <div class="result-stat-label">Words</div>
-                </div>
-                <div class="result-stat">
-                    <div class="result-stat-value">${result.sentence_count || '—'}</div>
-                    <div class="result-stat-label">Sentences</div>
-                </div>
-                <div class="result-stat">
-                    <div class="result-stat-value">${result.processing_time_ms}ms</div>
-                    <div class="result-stat-label">Speed</div>
-                </div>
-                <div class="result-stat">
-                    <div class="result-stat-value">${result.model_used}</div>
-                    <div class="result-stat-label">Engine</div>
-                </div>
-            </div>
-
-            ${patternsHtml}
 
             <div class="result-disclaimer">${result.disclaimer || 'This is an estimate — not a definitive classification.'}</div>
         </div>
@@ -257,11 +265,114 @@ function addResultBubble(result) {
     requestAnimationFrame(() => {
         const fill = bubble.querySelector('.gauge-fill');
         if (fill) fill.setAttribute('stroke-dashoffset', fill.dataset.target);
-        // Animate pattern bars
         bubble.querySelectorAll('.pattern-bar-fill').forEach(bar => {
             requestAnimationFrame(() => { bar.style.width = bar.dataset.width; });
         });
     });
+}
+
+
+// ── Pattern highlight colors ─────────────────────────────────────────────────
+
+const PATTERN_COLORS = {
+    ai_vocabulary:          '#ef4444',   // red
+    ai_pattern_density:     '#ef4444',   // red (same group)
+    inflated_significance:  '#f97316',   // orange
+    editorializing:         '#eab308',   // yellow
+    leftover_chat_artifacts:'#ec4899',   // pink
+    letter_style_formality: '#a855f7',   // purple
+    vague_attribution:      '#8b5cf6',   // violet
+    compulsive_summary:     '#06b6d4',   // cyan
+    negative_parallelism:   '#14b8a6',   // teal
+    false_ranges:           '#22c55e',   // green
+    low_sentence_variance:  '#64748b',   // gray (not highlightable)
+    em_dash_overuse:        '#f59e0b',   // amber
+    rule_of_three:          '#3b82f6',   // blue
+    formatting_overkill:    '#6366f1',   // indigo
+    _default:               '#94a3b8',   // slate
+};
+
+
+function buildHighlightedText(text, examples, patterns) {
+    if (!text) return '';
+
+    // Collect all match spans with their pattern category
+    const spans = []; // { start, end, pattern, match }
+
+    for (const [patternName, matchList] of Object.entries(examples)) {
+        if (!matchList || !Array.isArray(matchList)) continue;
+        const color = PATTERN_COLORS[patternName] || PATTERN_COLORS._default;
+        const label = patternName.replace(/_/g, ' ');
+
+        for (const match of matchList) {
+            if (!match || match.length < 2) continue;
+            // Find all occurrences of this match in the text (case-insensitive)
+            const lowerText = text.toLowerCase();
+            const lowerMatch = match.toLowerCase();
+            let searchFrom = 0;
+            while (true) {
+                const idx = lowerText.indexOf(lowerMatch, searchFrom);
+                if (idx === -1) break;
+                spans.push({
+                    start: idx,
+                    end: idx + match.length,
+                    pattern: patternName,
+                    label: label,
+                    color: color,
+                    match: text.substring(idx, idx + match.length),
+                });
+                searchFrom = idx + match.length;
+            }
+        }
+    }
+
+    if (spans.length === 0) {
+        return '<span class="ht-clean">' + escapeHtml(text) + '</span>';
+    }
+
+    // Sort by start position, longer spans first for overlaps
+    spans.sort((a, b) => a.start - b.start || b.end - a.end);
+
+    // Remove overlapping spans (keep the first/longer one)
+    const filtered = [];
+    let lastEnd = 0;
+    for (const s of spans) {
+        if (s.start >= lastEnd) {
+            filtered.push(s);
+            lastEnd = s.end;
+        }
+    }
+
+    // Build HTML
+    let html = '';
+    let cursor = 0;
+    for (const s of filtered) {
+        if (s.start > cursor) {
+            html += escapeHtml(text.substring(cursor, s.start));
+        }
+        html += `<mark class="ht-mark" style="--ht-color:${s.color}" title="${escapeAttr(s.label)}">${escapeHtml(s.match)}</mark>`;
+        cursor = s.end;
+    }
+    if (cursor < text.length) {
+        html += escapeHtml(text.substring(cursor));
+    }
+
+    return html;
+}
+
+
+function buildLegendHtml(examples, patterns) {
+    const seen = new Set();
+    let html = '';
+    for (const patternName of Object.keys(examples)) {
+        if (!examples[patternName] || examples[patternName].length === 0) continue;
+        if (seen.has(patternName)) continue;
+        seen.add(patternName);
+        const color = PATTERN_COLORS[patternName] || PATTERN_COLORS._default;
+        const label = patternName.replace(/_/g, ' ');
+        html += `<span class="legend-item"><span class="legend-dot" style="background:${color}"></span>${label}</span>`;
+    }
+    return html || '<span class="legend-item" style="color:var(--text-muted)">No patterns to highlight</span>';
 }
 
 
