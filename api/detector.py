@@ -79,18 +79,28 @@ FALSE_RANGE_PATTERN = r"\bfrom [\w\s]{2,30}? to [\w\s]{2,30}?(?=[.,;])"
 # ── Pattern weights (max points each pattern can contribute) ───────────────────
 
 PATTERN_WEIGHTS = {
-    "ai_vocabulary": 14,
-    "inflated_significance": 10,
+    "ai_vocabulary": 18,
+    "inflated_significance": 12,
     "negative_parallelism": 10,
     "false_ranges": 8,
-    "compulsive_summary": 8,
-    "editorializing": 8,
-    "vague_attribution": 8,
-    "letter_style_formality": 6,
-    "leftover_chat_artifacts": 14,  # near-certain tell if present
+    "compulsive_summary": 10,
+    "editorializing": 12,
+    "vague_attribution": 10,
+    "letter_style_formality": 8,
+    "leftover_chat_artifacts": 18,  # near-certain tell if present
     "em_dash_overuse": 8,
     "rule_of_three": 8,
     "formatting_overkill": 6,
+}
+
+# Minimum floor points if ANY match found (dead-giveaway patterns)
+PATTERN_FLOORS = {
+    "editorializing": 8,
+    "leftover_chat_artifacts": 12,
+    "letter_style_formality": 6,
+    "inflated_significance": 6,
+    "vague_attribution": 5,
+    "compulsive_summary": 5,
 }
 
 
@@ -222,7 +232,7 @@ def extract_all_patterns(text: str) -> Dict:
 
 # ── Scoring ───────────────────────────────────────────────────────────────────
 
-def _saturating(rate: float, scale: float = 3.0) -> float:
+def _saturating(rate: float, scale: float = 2.0) -> float:
     """Maps per-100-word rate to 0..1 with diminishing returns."""
     return 1 - math.exp(-rate / scale)
 
@@ -237,7 +247,13 @@ def heuristic_score(text: str, patterns: Optional[Dict] = None) -> Dict:
     for key, weight in PATTERN_WEIGHTS.items():
         count = patterns[key].get("count", 0)
         rate_per_100 = count / word_count * 100
-        contributions[key] = round(weight * _saturating(rate_per_100), 2)
+        score_from_rate = weight * _saturating(rate_per_100)
+
+        # Apply floor for dead-giveaway patterns (any single match = strong signal)
+        if count > 0 and key in PATTERN_FLOORS:
+            score_from_rate = max(score_from_rate, PATTERN_FLOORS[key])
+
+        contributions[key] = round(score_from_rate, 2)
 
     # Burstiness: low sentence-length variance = weak AI signal
     burst = patterns["burstiness"]
@@ -245,16 +261,24 @@ def heuristic_score(text: str, patterns: Optional[Dict] = None) -> Dict:
     if burst.get("coefficient_of_variation") is not None:
         cv = burst["coefficient_of_variation"]
         if cv < 0.35:
-            burstiness_contribution = round((0.35 - cv) / 0.35 * 6, 2)
+            burstiness_contribution = round((0.35 - cv) / 0.35 * 8, 2)
     contributions["low_sentence_variance"] = burstiness_contribution
 
+    # AI vocabulary density bonus — stacking multiple AI words = much stronger signal
+    vocab_count = patterns["ai_vocabulary"].get("count", 0)
+    if vocab_count >= 2:
+        density = vocab_count / word_count
+        # If 5%+ of words are AI vocab, strong bonus
+        density_bonus = min(density * 200, 15)  # up to 15 bonus points
+        contributions["ai_pattern_density"] = round(density_bonus, 2)
+
     total = min(sum(contributions.values()), 100.0)
-    detected = {k: v for k, v in contributions.items() if v > 1.0}
+    detected = {k: v for k, v in contributions.items() if v > 0.5}
     detected_sorted = dict(sorted(detected.items(), key=lambda kv: -kv[1]))
 
-    if total >= 60:
+    if total >= 55:
         verdict = "Likely AI-generated"
-    elif total >= 30:
+    elif total >= 25:
         verdict = "Possibly AI-assisted / mixed"
     else:
         verdict = "Likely human-written"
@@ -307,10 +331,12 @@ def predict(text: str, ml_model: Optional[Dict] = None) -> Dict:
     """Run heuristic scorer, optionally blend with ML prediction."""
     heur = heuristic_score(text)
     word_count = max(len(text.split()), 1)
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
 
     result = {
         "text_preview": text.strip()[:120] + ("..." if len(text.strip()) > 120 else ""),
         "word_count": word_count,
+        "sentence_count": len(sentences),
         "heuristic_score": heur["heuristic_score"],
         "heuristic_verdict": heur["verdict"],
         "detected_patterns": heur["top_detected_patterns"],
