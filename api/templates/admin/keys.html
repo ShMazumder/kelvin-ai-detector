@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set active_page = 'admin-keys' %}
+{% block title %}API Key Management — Kelvin{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <h2>API Key Management</h2>
+    <p>All API keys across all users</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    {% if keys %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Prefix</th>
+                    <th>Label</th>
+                    <th>Rate Limit</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Last Used</th>
+                    <th>Set Limit</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key in keys %}
+                <tr>
+                    <td class="text-mono text-sm">{{ key.id }}</td>
+                    <td class="text-sm">{{ key.user_email }}</td>
+                    <td class="text-mono text-sm">{{ key.key_prefix }}...</td>
+                    <td>{{ key.label }}</td>
+                    <td class="text-mono text-sm">{{ key.rate_limit }}/min</td>
+                    <td>
+                        {% if key.is_revoked %}
+                        <span class="badge badge-red">Revoked</span>
+                        {% else %}
+                        <span class="badge badge-green">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-sm text-muted">{{ key.created_at.strftime('%b %d, %Y') if key.created_at else '—' }}</td>
+                    <td class="text-sm text-muted">{{ key.last_used_at.strftime('%b %d, %H:%M') if key.last_used_at else 'Never' }}</td>
+                    <td>
+                        {% if not key.is_revoked %}
+                        <form method="POST" action="/admin/keys/{{ key.id }}/rate-limit" class="inline-form">
+                            <input type="number" name="rate_limit" value="{{ key.rate_limit }}" min="1" max="10000">
+                            <button type="submit" class="btn btn-secondary btn-sm">Set</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not key.is_revoked %}
+                        <form method="POST" action="/admin/keys/{{ key.id }}/revoke"
+                              onsubmit="return confirm('Revoke this key?')">
+                            <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🔑</div>
+        <h3>No API keys</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

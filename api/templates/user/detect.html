@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% set active_page = 'detect' %}
+{% block title %}Detect AI Text — Kelvin{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2>🔍 AI Text Detection</h2>
+            <p>Paste text to analyze for AI-generation patterns</p>
+        </div>
+        <div class="badge badge-blue">
+            Balance: <span id="balance-display">{{ user.balance | round(1) }}</span> credits
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+            <!-- Welcome message -->
+            <div class="chat-bubble system">
+                <div class="bubble-label">Kelvin</div>
+                <div class="bubble-text">Paste any text below and I'll analyze it for AI-generation patterns. I look at vocabulary choices, sentence structure, formatting habits, and more.
+
+Each analysis costs 1 credit. Press Ctrl+Enter or click → to submit.</div>
+            </div>
+
+            {% if result %}
+            <!-- Show server-side result if present (non-JS fallback) -->
+            <div class="chat-bubble user">
+                <div class="bubble-label">You</div>
+                <div class="bubble-text">{{ input_text[:500] }}{% if input_text|length > 500 %}...{% endif %}</div>
+            </div>
+            <div class="chat-bubble system">
+                <div class="bubble-label">Kelvin Analysis</div>
+                <div class="score-display">
+                    <div class="score-circle {% if result.final_score >= 60 %}score-high{% elif result.final_score >= 30 %}score-mid{% else %}score-low{% endif %}">
+                        {{ result.final_score }}
+                    </div>
+                    <div class="score-verdict">{{ result.final_verdict }}</div>
+                    <div class="text-sm text-muted mt-16">
+                        {{ result.model_used }} · {{ result.word_count }} words · {{ result.processing_time_ms }}ms
+                    </div>
+                </div>
+                {% if result.detected_patterns %}
+                <div class="patterns-list">
+                    {% for name, score in result.detected_patterns.items() %}
+                    <div class="pattern-item">
+                        <span class="pattern-name">{{ name | replace('_', ' ') }}</span>
+                        <span class="pattern-score">{{ score }} pts</span>
+                    </div>
+                    {% if result.pattern_examples and result.pattern_examples.get(name) %}
+                    <div class="pattern-examples">
+                        {% for ex in result.pattern_examples[name][:3] %}
+                        "{{ ex }}"{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="text-sm text-muted mt-16" style="font-style: italic">{{ result.disclaimer }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="chat-input-area">
+            <form id="chat-form" method="POST" action="/dashboard/detect">
+                <div class="chat-input-wrapper">
+                    <textarea id="chat-input" name="text" placeholder="Paste text here to analyze... (Ctrl+Enter to submit)"
+                              required minlength="20" maxlength="50000"></textarea>
+                    <button type="submit" id="chat-submit" class="btn btn-primary">→</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Override form to use AJAX for chat experience
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('chat-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const textarea = document.getElementById('chat-input');
+        const text = textarea.value.trim();
+        if (text.length < 20) return;
+
+        addUserMessage(text);
+        textarea.value = '';
+        textarea.style.height = 'auto';
+
+        const btn = document.getElementById('chat-submit');
+        btn.disabled = true;
+        btn.textContent = '⏳';
+
+        try {
+            const formData = new FormData();
+            formData.append('text', text);
+
+            const resp = await fetch('/dashboard/detect', {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'application/json' },
+            });
+
+            // If we get redirected (HTML response), fall back
+            const ct = resp.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+                const result = await resp.json();
+                addResultBubble(result);
+                const balEl = document.getElementById('balance-display');
+                if (balEl && result.remaining_balance !== undefined) {
+                    balEl.textContent = result.remaining_balance.toFixed(1);
+                }
+            } else {
+                // Fallback: reload page
+                window.location.reload();
+            }
+        } catch (err) {
+            addSystemMessage('Error: ' + err.message, true);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '→';
+        }
+    });
+});
+</script>
+{% endblock %}

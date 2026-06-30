@@ -1,13 +1,24 @@
-# Kelvin AI Text Detector — API Dependencies
+# Kelvin AI Text Detector — Dependencies
 # Install: pip install -r requirements.txt
 
-# Core (required)
+# Core
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 
-# ML model support (optional — only needed if using trained classifier)
-# Uncomment these when you have a trained model to deploy:
+# Database
+sqlalchemy>=2.0.0
+
+# Auth
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+
+# Templates + static files
+jinja2>=3.1.0
+python-multipart>=0.0.6
+aiofiles>=23.0.0
+
+# ML model support (optional — uncomment when using trained classifier)
 # scikit-learn>=1.3.0
 # numpy>=1.24.0
 # scipy>=1.11.0

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% set active_page = 'user-topup' %}
+{% block title %}Balance & Top Up — Kelvin{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <h2>Balance & Top Up</h2>
+    <p>Current balance: <strong>{{ user.balance | round(1) }}</strong> credits</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card accent">
+        <div class="stat-label">Current Balance</div>
+        <div class="stat-value">{{ user.balance | round(1) }}</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-label">Cost Per Detection</div>
+        <div class="stat-value">1.0</div>
+    </div>
+    <div class="stat-card yellow">
+        <div class="stat-label">Detections Remaining</div>
+        <div class="stat-value">{{ user.balance | int }}</div>
+    </div>
+</div>
+
+<div class="card mb-24">
+    <div class="card-header">
+        <h3>Request Top Up</h3>
+    </div>
+    <div class="alert alert-info">
+        Contact your administrator to top up your balance. Self-service payments coming soon.
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Transaction History</h3>
+    </div>
+
+    {% if transactions %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Balance After</th>
+                    <th>Description</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions %}
+                <tr>
+                    <td>
+                        {% if tx.type == 'topup' or tx.type == 'signup_bonus' %}
+                        <span class="badge badge-green">{{ tx.type }}</span>
+                        {% elif tx.type == 'deduction' %}
+                        <span class="badge badge-yellow">deduction</span>
+                        {% elif tx.type == 'refund' %}
+                        <span class="badge badge-blue">refund</span>
+                        {% else %}
+                        <span class="badge badge-muted">{{ tx.type }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-mono {% if tx.amount > 0 %}text-green{% else %}text-red{% endif %}">
+                        {{ '+' if tx.amount > 0 else '' }}{{ tx.amount | round(1) }}
+                    </td>
+                    <td class="text-mono text-sm">{{ tx.balance_after | round(1) if tx.balance_after else '—' }}</td>
+                    <td class="text-sm">{{ tx.description or '—' }}</td>
+                    <td class="text-sm text-muted">{{ tx.created_at.strftime('%b %d, %H:%M') if tx.created_at else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">💰</div>
+        <h3>No transactions yet</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

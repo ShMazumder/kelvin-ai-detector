@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Login — Kelvin AI Detector{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="brand-icon">K</div>
+                <h1>Welcome Back</h1>
+                <p>Sign in to Kelvin AI Detector</p>
+            </div>
+
+            {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" action="/login">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" class="form-input" required
+                           placeholder="you@example.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-input" required
+                           placeholder="••••••••" autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                    Sign In
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                Don't have an account? <a href="/register">Create one</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

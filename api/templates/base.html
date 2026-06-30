@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kelvin AI Detector{% endblock %}</title>
+    <meta name="description" content="Detect AI-generated text with heuristic pattern analysis and optional ML classification.">
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% block body %}
+    <button class="mobile-toggle" aria-label="Toggle menu">☰</button>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">K</div>
+                <div>
+                    <h1>Kelvin</h1>
+                    <div class="brand-version">AI Text Detector</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                {% if user and user.role == 'admin' %}
+                <!-- Admin nav -->
+                <div class="nav-section">
+                    <div class="nav-section-title">Admin</div>
+                    <a href="/admin/dashboard" class="nav-link {% if active_page == 'admin-dashboard' %}active{% endif %}">
+                        <span class="nav-icon">📊</span> Dashboard
+                    </a>
+                    <a href="/admin/users" class="nav-link {% if active_page == 'admin-users' %}active{% endif %}">
+                        <span class="nav-icon">👥</span> Users
+                    </a>
+                    <a href="/admin/keys" class="nav-link {% if active_page == 'admin-keys' %}active{% endif %}">
+                        <span class="nav-icon">🔑</span> API Keys
+                    </a>
+                    <a href="/admin/logs" class="nav-link {% if active_page == 'admin-logs' %}active{% endif %}">
+                        <span class="nav-icon">📋</span> Detection Logs
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Tools</div>
+                    <a href="/dashboard/detect" class="nav-link {% if active_page == 'detect' %}active{% endif %}">
+                        <span class="nav-icon">🔍</span> Detect Text
+                    </a>
+                </div>
+                {% elif user %}
+                <!-- User nav -->
+                <div class="nav-section">
+                    <div class="nav-section-title">Dashboard</div>
+                    <a href="/dashboard" class="nav-link {% if active_page == 'user-dashboard' %}active{% endif %}">
+                        <span class="nav-icon">🏠</span> Overview
+                    </a>
+                    <a href="/dashboard/detect" class="nav-link {% if active_page == 'detect' %}active{% endif %}">
+                        <span class="nav-icon">🔍</span> Detect Text
+                    </a>
+                    <a href="/dashboard/keys" class="nav-link {% if active_page == 'user-keys' %}active{% endif %}">
+                        <span class="nav-icon">🔑</span> API Keys
+                    </a>
+                    <a href="/dashboard/usage" class="nav-link {% if active_page == 'user-usage' %}active{% endif %}">
+                        <span class="nav-icon">📈</span> Usage History
+                    </a>
+                    <a href="/dashboard/topup" class="nav-link {% if active_page == 'user-topup' %}active{% endif %}">
+                        <span class="nav-icon">💰</span> Balance & Top Up
+                    </a>
+                </div>
+                {% endif %}
+            </nav>
+
+            {% if user %}
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">{{ user.display_name[0] | upper }}</div>
+                    <div class="user-info">
+                        <div class="user-name">{{ user.display_name }}</div>
+                        <div class="user-role">{{ user.role }} · {{ user.balance | round(1) }} credits</div>
+                    </div>
+                </div>
+                <a href="/logout" class="nav-link" style="margin-top: 8px;">
+                    <span class="nav-icon">🚪</span> Logout
+                </a>
+            </div>
+            {% endif %}
+        </aside>
+
+        <!-- Main content -->
+        <main class="main-content">
+            {% block page_header %}{% endblock %}
+            <div class="page-body">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    {% endblock %}
+
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

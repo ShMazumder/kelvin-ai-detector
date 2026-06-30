@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% set active_page = 'admin-logs' %}
+{% block title %}Detection Logs — Kelvin{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <h2>Detection Logs</h2>
+    <p>All detection requests across all users</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    {% if logs %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Score</th>
+                    <th>Verdict</th>
+                    <th>Model</th>
+                    <th>Words</th>
+                    <th>Cost</th>
+                    <th>Preview</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="text-mono text-sm">{{ log.id }}</td>
+                    <td class="text-sm">{{ log.user_email }}</td>
+                    <td>
+                        <span class="badge {% if log.score and log.score >= 60 %}badge-red{% elif log.score and log.score >= 30 %}badge-yellow{% else %}badge-green{% endif %}">
+                            {{ log.score | round(1) if log.score else '—' }}
+                        </span>
+                    </td>
+                    <td class="text-sm">{{ log.verdict or '—' }}</td>
+                    <td class="text-sm text-muted">{{ log.model_used or '—' }}</td>
+                    <td class="text-mono text-sm">{{ log.word_count or '—' }}</td>
+                    <td class="text-mono text-sm">{{ log.cost }}</td>
+                    <td class="truncate text-sm">{{ log.input_text[:60] }}{% if log.input_text|length > 60 %}...{% endif %}</td>
+                    <td class="text-sm text-muted">{{ log.created_at.strftime('%b %d, %H:%M') if log.created_at else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>No logs yet</h3>
+        <p>Detection activity will appear here.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

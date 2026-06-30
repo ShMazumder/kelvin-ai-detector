@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% set active_page = 'admin-users' %}
+{% block title %}User Management — Kelvin{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <h2>User Management</h2>
+    <p>{{ users | length }} registered users</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Balance</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th>Top Up</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td class="text-mono text-sm">{{ u.id }}</td>
+                    <td>{{ u.display_name }}</td>
+                    <td class="text-sm">{{ u.email }}</td>
+                    <td>
+                        <span class="badge {% if u.role == 'admin' %}badge-blue{% else %}badge-muted{% endif %}">
+                            {{ u.role }}
+                        </span>
+                    </td>
+                    <td class="text-mono">{{ u.balance | round(1) }}</td>
+                    <td>
+                        {% if u.is_active %}
+                        <span class="badge badge-green">Active</span>
+                        {% else %}
+                        <span class="badge badge-red">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-sm text-muted">{{ u.created_at.strftime('%b %d, %Y') if u.created_at else '—' }}</td>
+                    <td>
+                        <form method="POST" action="/admin/users/{{ u.id }}/topup" class="inline-form">
+                            <input type="number" name="amount" value="100" min="1" max="999999" step="1">
+                            <button type="submit" class="btn btn-success btn-sm">+</button>
+                        </form>
+                    </td>
+                    <td>
+                        {% if u.role != 'admin' or u.id != user.id %}
+                        <form method="POST" action="/admin/users/{{ u.id }}/toggle" style="display:inline">
+                            <button type="submit" class="btn {% if u.is_active %}btn-danger{% else %}btn-success{% endif %} btn-sm">
+                                {{ 'Disable' if u.is_active else 'Enable' }}
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

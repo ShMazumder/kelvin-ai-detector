@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% set active_page = 'user-keys' %}
+{% block title %}API Keys — Kelvin{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <h2>API Keys</h2>
+    <p>Manage your API keys for programmatic access</p>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if new_key %}
+<div class="alert alert-success">
+    <strong>New API key created!</strong> Copy it now — it won't be shown again.
+</div>
+<div class="key-display">
+    <code id="new-key-value">{{ new_key }}</code>
+    <button class="copy-btn" onclick="copyKey('{{ new_key }}', this)">Copy</button>
+</div>
+{% endif %}
+
+<!-- Create key form -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h3>Create New Key</h3>
+    </div>
+    <form method="POST" action="/dashboard/keys/create">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="label">Label</label>
+                <input type="text" id="label" name="label" class="form-input" required
+                       placeholder="e.g. Production, Testing" maxlength="100">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Key</button>
+    </form>
+</div>
+
+<!-- Existing keys -->
+<div class="card">
+    <div class="card-header">
+        <h3>Your Keys</h3>
+    </div>
+
+    {% if keys %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Prefix</th>
+                    <th>Label</th>
+                    <th>Rate Limit</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Last Used</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key in keys %}
+                <tr>
+                    <td class="text-mono text-sm">{{ key.key_prefix }}...</td>
+                    <td>{{ key.label }}</td>
+                    <td class="text-mono text-sm">{{ key.rate_limit }}/min</td>
+                    <td>
+                        {% if key.is_revoked %}
+                        <span class="badge badge-red">Revoked</span>
+                        {% else %}
+                        <span class="badge badge-green">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-sm text-muted">{{ key.created_at.strftime('%b %d, %Y') if key.created_at else '—' }}</td>
+                    <td class="text-sm text-muted">{{ key.last_used_at.strftime('%b %d, %H:%M') if key.last_used_at else 'Never' }}</td>
+                    <td>
+                        {% if not key.is_revoked %}
+                        <form method="POST" action="/dashboard/keys/{{ key.id }}/delete"
+                              onsubmit="return confirm('Revoke this key? This cannot be undone.')">
+                            <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🔑</div>
+        <h3>No API keys yet</h3>
+        <p>Create a key above to start using the API programmatically.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- API usage example -->
+<div class="card mt-24">
+    <div class="card-header">
+        <h3>Quick Start</h3>
+    </div>
+    <pre style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; overflow-x: auto; color: var(--text-secondary);">curl -X POST http://localhost:8000/api/detect \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_KEY_HERE" \
+  -d '{"text": "Your text to analyze..."}'</pre>
+</div>
+{% endblock %}

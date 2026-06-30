@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set active_page = 'admin-dashboard' %}
+{% block title %}Admin Dashboard — Kelvin{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <h2>Admin Dashboard</h2>
+    <p>System overview and recent activity</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card accent">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value">{{ total_users }}</div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-label">Total Detections</div>
+        <div class="stat-value">{{ total_requests }}</div>
+    </div>
+    <div class="stat-card yellow">
+        <div class="stat-label">Active API Keys</div>
+        <div class="stat-value">{{ active_keys }}</div>
+    </div>
+    <div class="stat-card red">
+        <div class="stat-label">Credits Used</div>
+        <div class="stat-value">{{ total_credits | round(0) | int }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Detection Activity</h3>
+        <a href="/admin/logs" class="btn btn-secondary btn-sm">View All Logs</a>
+    </div>
+
+    {% if recent_logs %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Score</th>
+                    <th>Verdict</th>
+                    <th>Words</th>
+                    <th>Preview</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                    <td class="text-sm">{{ log.user_email }}</td>
+                    <td>
+                        <span class="badge {% if log.score and log.score >= 60 %}badge-red{% elif log.score and log.score >= 30 %}badge-yellow{% else %}badge-green{% endif %}">
+                            {{ log.score | round(1) if log.score else '—' }}
+                        </span>
+                    </td>
+                    <td class="text-sm">{{ log.verdict or '—' }}</td>
+                    <td class="text-mono text-sm">{{ log.word_count or '—' }}</td>
+                    <td class="truncate text-sm">{{ log.input_text[:60] }}{% if log.input_text|length > 60 %}...{% endif %}</td>
+                    <td class="text-sm text-muted">{{ log.created_at.strftime('%b %d, %H:%M') if log.created_at else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📊</div>
+        <h3>No activity yet</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
