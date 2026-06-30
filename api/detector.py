@@ -374,9 +374,9 @@ def predict(text: str, ml_model: Optional[Dict] = None) -> Dict:
         result["model_used"] = "heuristic"
 
     score = result["final_score"]
-    if score >= 60:
+    if score >= 55:
         result["final_verdict"] = "Likely AI-generated"
-    elif score >= 30:
+    elif score >= 25:
         result["final_verdict"] = "Possibly AI-assisted / mixed"
     else:
         result["final_verdict"] = "Likely human-written"
