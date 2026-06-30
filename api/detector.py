@@ -237,6 +237,12 @@ PATTERN_WEIGHTS = {
     "title_case_headings": 6,
     "inline_header_lists": 8,
     "constructive_criticism": 8,
+    # ── Wikipedia & General AI tells (v3) ──
+    "lead_proper_noun": 8,
+    "thematic_break_headings": 6,
+    "skipped_headings": 6,
+    "consecutive_sentence_starters": 8,
+    "list_item_sentence_count_uniformity": 8,
 }
 
 # Minimum floor points if ANY match found (dead-giveaway patterns)
@@ -256,6 +262,8 @@ PATTERN_FLOORS = {
     "deepseek_artifacts": 25,  # dead-giveaway, immediate possibly-AI
     "inline_header_lists": 5,
     "constructive_criticism": 6,
+    # ── New floors (v3) ──
+    "lead_proper_noun": 5,
 }
 
 
@@ -517,6 +525,79 @@ def detect_paragraph_uniformity(text: str) -> Dict:
     }
 
 
+# ── Wikipedia & General AI Tells (v3) ──
+
+def detect_lead_proper_noun(text: str) -> Dict:
+    """Detect AI writing leads treating list/titles as proper nouns."""
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    if not sentences:
+        return {"count": 0, "matches": []}
+    first_sent = sentences[0]
+    pattern = r"^(?:List|History|Outline|Timeline) of\s+[A-Z]\w*(?:\s+[a-zA-Z0-9'\-]+){0,10}?\s+(?:is|was|are|were)\b"
+    m = re.findall(pattern, first_sent)
+    return {"count": len(m), "matches": m}
+
+
+def detect_thematic_break_headings(text: str) -> Dict:
+    """Detect thematic breaks directly preceding section headings."""
+    pattern = r"(?m)^-{3,5}\s*\n\s*#{1,6}\s+.+$"
+    m = re.findall(pattern, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_skipped_headings(text: str) -> Dict:
+    """Detect skipped heading levels (e.g., H2 followed by H4)."""
+    headings = re.findall(r"(?m)^\s*(#{1,6})\s+", text)
+    skipped = []
+    prev_level = None
+    for h in headings:
+        level = len(h)
+        if prev_level is not None:
+            if level > prev_level + 1:
+                skipped.append(f"Skipped from H{prev_level} to H{level}")
+        prev_level = level
+    return {"count": len(skipped), "matches": skipped}
+
+
+def detect_consecutive_sentence_starters(text: str) -> Dict:
+    """Detect consecutive sentences starting with the same words."""
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    matches = []
+    prev_prefix = None
+    for s in sentences:
+        words = s.lower().split()
+        if len(words) >= 3:
+            prefix = " ".join(words[:3])
+            prefix = re.sub(r"[^\w\s]", "", prefix).strip()
+            if prev_prefix and prefix == prev_prefix:
+                matches.append(prefix)
+            prev_prefix = prefix
+        else:
+            prev_prefix = None
+    return {"count": len(matches), "matches": list(set(matches))}
+
+
+def detect_list_uniformity(text: str) -> Dict:
+    """Detect uniform list item sentence counts."""
+    bullets = re.findall(r"(?m)^\s*[-*\u2022]\s+(.+)$", text)
+    if len(bullets) < 3:
+        return {"count": 0, "matches": [], "cv": 0.0}
+    
+    sentence_counts = []
+    for b in bullets:
+        sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", b) if s.strip()]
+        sentence_counts.append(len(sents))
+    
+    if len(sentence_counts) >= 3:
+        mean_len = statistics.mean(sentence_counts)
+        stdev_len = statistics.stdev(sentence_counts)
+        if mean_len > 0:
+            cv = stdev_len / mean_len
+            if cv < 0.2:
+                return {"count": 1, "matches": [f"Uniform sentence count list: {sentence_counts}"], "cv": round(cv, 3)}
+    return {"count": 0, "matches": [], "cv": 0.0}
+
+
 # ── Aggregate extraction ──────────────────────────────────────────────────────
 
 def extract_all_patterns(text: str) -> Dict:
@@ -556,6 +637,12 @@ def extract_all_patterns(text: str) -> Dict:
         "constructive_criticism": detect_constructive_criticism(text),
         "passive_voice": detect_passive_voice(text),
         "paragraph_uniformity": detect_paragraph_uniformity(text),
+        # ── Wikipedia & General AI tells (v3) ──
+        "lead_proper_noun": detect_lead_proper_noun(text),
+        "thematic_break_headings": detect_thematic_break_headings(text),
+        "skipped_headings": detect_skipped_headings(text),
+        "consecutive_sentence_starters": detect_consecutive_sentence_starters(text),
+        "list_item_sentence_count_uniformity": detect_list_uniformity(text),
     }
 
 
