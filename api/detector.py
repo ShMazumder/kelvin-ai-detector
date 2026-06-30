@@ -29,6 +29,13 @@ AI_VOCAB = [
     "vibrant", "align with", "garner", "meticulous", "meticulously", "interplay",
     "profound", "exemplifies", "showcasing", "natural beauty", "nestled",
     "in the heart of", "groundbreaking", "renowned", "diverse array", "additionally",
+    # ── Expanded vocabulary (v2) ──
+    "spearhead", "spearheading", "embark", "embarking", "resonate", "resonates",
+    "juxtaposition", "synergy", "burgeoning", "confluence",
+    "catalyze", "catalyzing", "galvanize", "galvanizing", "nuanced",
+    "cornerstone", "linchpin", "bulwark", "bedrock", "ethos",
+    "pivoting", "underpin", "underpinning", "dovetail", "dovetails",
+    "facet", "facets", "overarching", "underscored",
 ]
 
 INFLATED_SIGNIFICANCE_PHRASES = [
@@ -136,6 +143,67 @@ NEGATIVE_PARALLELISM_PATTERNS = [
 ]
 FALSE_RANGE_PATTERN = r"\bfrom [\w\s]{2,30}? to [\w\s]{2,30}?(?=[.,;])"
 
+PROMOTIONAL_SUPERLATIVE_PHRASES = [
+    r"\bone of the most\b", r"\bwidely regarded as\b",
+    r"\ba leading (figure|provider|company|authority|voice)\b",
+    r"\bworld-class\b", r"\bindustry-leading\b",
+    r"\binternationally (acclaimed|recognized|renowned)\b",
+    r"\bcutting-edge\b", r"\bstate-of-the-art\b",
+    r"\bpremier\b", r"\btrailblaz(er|ing)\b",
+    r"\bunmatched\b", r"\bsecond to none\b",
+    r"\bglobally recognized\b", r"\bpioneering\b",
+]
+
+EXCESSIVE_TRANSITION_PHRASES = [
+    r"\bfurthermore\b", r"\bmoreover\b", r"\bconsequently\b",
+    r"\bin addition(?:\s+to this)?\b", r"\bnevertheless\b",
+    r"\bnonetheless\b", r"\bhence\b", r"\bthus\b,",
+    r"\bthereby\b", r"\baccordingly\b",
+]
+
+SENTENCE_INITIAL_ADVERBS = [
+    r"(?:^|(?<=\.\s))Notably\b",
+    r"(?:^|(?<=\.\s))Importantly\b",
+    r"(?:^|(?<=\.\s))Interestingly\b",
+    r"(?:^|(?<=\.\s))Remarkably\b",
+    r"(?:^|(?<=\.\s))Significantly\b",
+    r"(?:^|(?<=\.\s))Crucially\b",
+    r"(?:^|(?<=\.\s))Essentially\b",
+    r"(?:^|(?<=\.\s))Fundamentally\b",
+]
+
+TEMPORAL_VAGUENESS_PHRASES = [
+    r"\bin recent years\b", r"\bover the past decade\b",
+    r"\bin the coming years\b", r"\bin recent times\b",
+    r"\bthroughout history\b", r"\bover the years\b",
+    r"\bfor (?:many|several) years\b", r"\bin modern times\b",
+    r"\bhistorically\b,", r"\bas time (?:went|goes) on\b",
+]
+
+DEEPSEEK_ARTIFACT_PHRASES = [
+    r"\battributableIndex\b",
+    r":::writing\b",
+    r":::thinking\b",
+    r"\bsearch_result_\d+\b",
+]
+
+INLINE_HEADER_LIST_PATTERNS = [
+    r"(?m)^\s*[-*\u2022]\s*\*\*[^*]+\*\*\s*[:—–\-]",
+]
+
+CONSTRUCTIVE_CRITICISM_PHRASES = [
+    r"\bi welcome (?:any |your )?(?:feedback|suggestions|input)\b",
+    r"\bfeel free to (?:suggest|provide|offer) (?:improvements|feedback|corrections)\b",
+    r"\bopen to (?:suggestions|feedback|constructive criticism)\b",
+    r"\bdon'?t hesitate to (?:point out|suggest|correct)\b",
+    r"\bi(?:'m| am) happy to (?:make|incorporate) (?:any )?(?:changes|revisions|corrections)\b",
+    r"\bplease (?:let me know|feel free) if (?:any|you have) (?:changes|corrections|suggestions)\b",
+]
+
+PASSIVE_VOICE_PATTERNS = [
+    r"\b(?:is|are|was|were|been|being)\s+(?:\w+ly\s+)?\w+ed\b",
+]
+
 # ── Pattern weights (max points each pattern can contribute) ───────────────────
 
 PATTERN_WEIGHTS = {
@@ -160,6 +228,15 @@ PATTERN_WEIGHTS = {
     "pua_citation_bugs": 15,
     "knowledge_cutoff_disclaimers": 10,
     "utm_parameters": 16,
+    # ── New patterns (v2) ──
+    "promotional_superlatives": 10,
+    "excessive_transitions": 8,
+    "sentence_initial_adverbs": 8,
+    "temporal_vagueness": 6,
+    "deepseek_artifacts": 16,
+    "title_case_headings": 6,
+    "inline_header_lists": 8,
+    "constructive_criticism": 8,
 }
 
 # Minimum floor points if ANY match found (dead-giveaway patterns)
@@ -174,6 +251,11 @@ PATTERN_FLOORS = {
     "markdown_leak": 8,
     "pua_citation_bugs": 25,  # immediate possibly-AI threshold
     "utm_parameters": 25,  # immediate possibly-AI threshold
+    # ── New floors (v2) ──
+    "promotional_superlatives": 5,
+    "deepseek_artifacts": 25,  # dead-giveaway, immediate possibly-AI
+    "inline_header_lists": 5,
+    "constructive_criticism": 6,
 }
 
 
@@ -342,6 +424,99 @@ def detect_lexical_diversity(text: str) -> Dict:
     return {"unique_words": len(set(words)), "total_words": len(words), "ttr": round(ttr, 3)}
 
 
+# ── New pattern detectors (v2) ─────────────────────────────────────────────────
+
+def detect_promotional_superlatives(text: str) -> Dict:
+    m = _find_all(PROMOTIONAL_SUPERLATIVE_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_excessive_transitions(text: str) -> Dict:
+    m = _find_all(EXCESSIVE_TRANSITION_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_sentence_initial_adverbs(text: str) -> Dict:
+    m = _find_all(SENTENCE_INITIAL_ADVERBS, text, flags=re.MULTILINE)
+    return {"count": len(m), "matches": m}
+
+
+def detect_temporal_vagueness(text: str) -> Dict:
+    m = _find_all(TEMPORAL_VAGUENESS_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_deepseek_artifacts(text: str) -> Dict:
+    m = _find_all(DEEPSEEK_ARTIFACT_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_title_case_headings(text: str) -> Dict:
+    """Detect AI-style title-cased headings like 'Early Life And Career'.
+    Looks for lines where 3+ words are capitalized (excluding short articles/preps)."""
+    MINOR_WORDS = {"a", "an", "the", "and", "or", "but", "in", "on", "at",
+                   "to", "for", "of", "by", "with", "from", "as", "is", "nor"}
+    heading_re = re.compile(r"(?m)^(?:#{1,4}\s+)?(.+)$")
+    matches = []
+    for m in heading_re.finditer(text):
+        line = m.group(1).strip()
+        words = line.split()
+        if len(words) < 3:
+            continue
+        # Count words that are capitalized (excluding minor words in middle positions)
+        cap_count = 0
+        for i, w in enumerate(words):
+            clean = re.sub(r"[^a-zA-Z]", "", w)
+            if not clean:
+                continue
+            if clean[0].isupper() and clean.lower() not in MINOR_WORDS:
+                cap_count += 1
+            elif i > 0 and clean[0].isupper() and clean.lower() in MINOR_WORDS:
+                # Minor word capitalized mid-heading = strong title-case signal
+                cap_count += 1
+        # Flag if most non-trivial words are capitalized
+        if cap_count >= len(words) * 0.7 and cap_count >= 3:
+            matches.append(line)
+    return {"count": len(matches), "matches": matches[:10]}
+
+
+def detect_inline_header_lists(text: str) -> Dict:
+    m = _find_all(INLINE_HEADER_LIST_PATTERNS, text, flags=re.MULTILINE)
+    return {"count": len(m), "matches": m}
+
+
+def detect_constructive_criticism(text: str) -> Dict:
+    m = _find_all(CONSTRUCTIVE_CRITICISM_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_passive_voice(text: str) -> Dict:
+    """Detect passive voice constructions. Counts all matches for highlighting,
+    but scoring only kicks in above a rate threshold (handled in heuristic_score)."""
+    m = _find_all(PASSIVE_VOICE_PATTERNS, text)
+    words = max(len(text.split()), 1)
+    rate_per_100w = len(m) / words * 100
+    return {"count": len(m), "rate_per_100_words": round(rate_per_100w, 2), "matches": m[:20]}
+
+
+def detect_paragraph_uniformity(text: str) -> Dict:
+    """Low variance in paragraph lengths suggests AI authorship.
+    Silently skips texts with fewer than 3 paragraphs."""
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    lengths = [len(p.split()) for p in paragraphs if len(p.split()) > 0]
+    if len(lengths) < 3:
+        return {"paragraph_count": len(lengths), "stdev": None, "mean": None}
+    mean_len = statistics.mean(lengths)
+    stdev_len = statistics.stdev(lengths)
+    cv = stdev_len / max(mean_len, 1)
+    return {
+        "paragraph_count": len(lengths),
+        "mean_length": round(mean_len, 1),
+        "stdev": round(stdev_len, 1),
+        "coefficient_of_variation": round(cv, 3),
+    }
+
+
 # ── Aggregate extraction ──────────────────────────────────────────────────────
 
 def extract_all_patterns(text: str) -> Dict:
@@ -370,6 +545,17 @@ def extract_all_patterns(text: str) -> Dict:
         "pua_citation_bugs": detect_pua_citation_bugs(text),
         "knowledge_cutoff_disclaimers": detect_knowledge_cutoff_disclaimers(text),
         "utm_parameters": detect_utm_parameters(text),
+        # ── New patterns (v2) ──
+        "promotional_superlatives": detect_promotional_superlatives(text),
+        "excessive_transitions": detect_excessive_transitions(text),
+        "sentence_initial_adverbs": detect_sentence_initial_adverbs(text),
+        "temporal_vagueness": detect_temporal_vagueness(text),
+        "deepseek_artifacts": detect_deepseek_artifacts(text),
+        "title_case_headings": detect_title_case_headings(text),
+        "inline_header_lists": detect_inline_header_lists(text),
+        "constructive_criticism": detect_constructive_criticism(text),
+        "passive_voice": detect_passive_voice(text),
+        "paragraph_uniformity": detect_paragraph_uniformity(text),
     }
 
 
@@ -414,6 +600,27 @@ def heuristic_score(text: str, patterns: Optional[Dict] = None) -> Dict:
         # If 5%+ of words are AI vocab, strong bonus
         density_bonus = min(density * 200, 15)  # up to 15 bonus points
         contributions["ai_pattern_density"] = round(density_bonus, 2)
+
+    # Passive voice: only contribute when rate exceeds 5 per 100 words
+    pv = patterns["passive_voice"]
+    pv_rate = pv.get("rate_per_100_words", 0)
+    pv_contribution = 0.0
+    if pv_rate > 5.0:
+        # Scale 0..6 based on how far above threshold
+        pv_contribution = round(min((pv_rate - 5.0) / 5.0 * 6, 6), 2)
+    elif pv.get("count", 0) > 0 and pv_rate > 3.0:
+        # Mild signal between 3-5 per 100 words
+        pv_contribution = round((pv_rate - 3.0) / 2.0 * 3, 2)
+    contributions["passive_voice_overuse"] = pv_contribution
+
+    # Paragraph uniformity: low CV = AI-like uniform paragraphs
+    para = patterns["paragraph_uniformity"]
+    para_contribution = 0.0
+    if para.get("coefficient_of_variation") is not None:
+        pcv = para["coefficient_of_variation"]
+        if pcv < 0.30:
+            para_contribution = round((0.30 - pcv) / 0.30 * 6, 2)
+    contributions["paragraph_uniformity"] = para_contribution
 
     total = min(sum(contributions.values()), 100.0)
     detected = {k: v for k, v in contributions.items() if v > 0.5}
@@ -534,6 +741,8 @@ def _build_heuristic_vector(heur: Dict):
 
     row = [heur["contributions"].get(k, 0.0) for k in PATTERN_WEIGHTS.keys()]
     row.append(heur["contributions"].get("low_sentence_variance", 0.0))
+    row.append(heur["contributions"].get("passive_voice_overuse", 0.0))
+    row.append(heur["contributions"].get("paragraph_uniformity", 0.0))
     ttr = heur["raw_patterns"]["lexical_diversity"].get("ttr") or 0.0
     row.append(ttr)
     return np.array([row])

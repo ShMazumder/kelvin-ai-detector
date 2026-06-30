@@ -291,6 +291,24 @@ const PATTERN_COLORS = {
     formatting_overkill:    '#6366f1',   // indigo
     media_puffery:          '#f43f5e',   // rose
     citation_bugs:          '#a21caf',   // magenta
+    // ── New patterns (v2) ──
+    promotional_superlatives:'#dc2626',  // darker red
+    excessive_transitions:   '#0ea5e9',  // sky blue
+    sentence_initial_adverbs:'#8b5cf6',  // violet
+    temporal_vagueness:      '#d97706',  // amber
+    deepseek_artifacts:      '#be123c',  // crimson
+    title_case_headings:     '#0d9488',  // teal
+    passive_voice:           '#7c3aed',  // purple
+    inline_header_lists:     '#2563eb',  // blue
+    constructive_criticism:  '#e11d48',  // rose
+    paragraph_uniformity:    '#64748b',  // gray (not highlightable)
+    curly_quotes:            '#d946ef',  // fuchsia
+    markdown_leak:           '#059669',  // emerald
+    collective_we:           '#06b6d4',  // cyan-alt
+    copulative_avoidance:    '#a3a3a3',  // neutral
+    pua_citation_bugs:       '#a21caf',  // magenta-alt
+    knowledge_cutoff_disclaimers:'#b45309', // dark amber
+    utm_parameters:          '#991b1b',  // dark red
     _default:               '#94a3b8',   // slate
 };
 
