@@ -289,6 +289,8 @@ const PATTERN_COLORS = {
     em_dash_overuse:        '#f59e0b',   // amber
     rule_of_three:          '#3b82f6',   // blue
     formatting_overkill:    '#6366f1',   // indigo
+    media_puffery:          '#f43f5e',   // rose
+    citation_bugs:          '#a21caf',   // magenta
     _default:               '#94a3b8',   // slate
 };
 

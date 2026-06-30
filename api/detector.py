@@ -73,6 +73,23 @@ LEFTOVER_CHAT_ARTIFACTS = [
     r"\bhappy to help\b",
 ]
 
+MEDIA_COVERAGE_PHRASES = [
+    r"\bfeatured in (?:regional|local|national|major|prominent) media(?:\s+outlets)?\b",
+    r"\bprominent media outlets\b",
+    r"\bindependent coverage\b",
+    r"\btrade publications\b",
+    r"\bprofiled in\b",
+    r"\bactive social media presence\b",
+]
+
+CITATION_BUG_PHRASES = [
+    r"\bcontentReference\b",
+    r"\boaicite(?::\d+)?\b",
+    r"\boai_citation(?::\d+)?\b",
+    r"\battached_file\b",
+    r"\bgrok_card\b",
+]
+
 NEGATIVE_PARALLELISM_PATTERN = r"\bit'?s not (?:just )?[\w\s]{2,40}?, it'?s [\w\s]{2,40}"
 FALSE_RANGE_PATTERN = r"\bfrom [\w\s]{2,30}? to [\w\s]{2,30}?(?=[.,;])"
 
@@ -91,6 +108,8 @@ PATTERN_WEIGHTS = {
     "em_dash_overuse": 8,
     "rule_of_three": 8,
     "formatting_overkill": 6,
+    "media_puffery": 10,
+    "citation_bugs": 14,
 }
 
 # Minimum floor points if ANY match found (dead-giveaway patterns)
@@ -101,6 +120,7 @@ PATTERN_FLOORS = {
     "inflated_significance": 6,
     "vague_attribution": 5,
     "compulsive_summary": 5,
+    "citation_bugs": 10,
 }
 
 
@@ -159,6 +179,16 @@ def detect_letter_style(text: str) -> Dict:
 
 def detect_leftover_chat_artifacts(text: str) -> Dict:
     m = _find_all(LEFTOVER_CHAT_ARTIFACTS, text, flags=re.IGNORECASE | re.MULTILINE)
+    return {"count": len(m), "matches": m}
+
+
+def detect_media_puffery(text: str) -> Dict:
+    m = _find_all(MEDIA_COVERAGE_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_citation_bugs(text: str) -> Dict:
+    m = _find_all(CITATION_BUG_PHRASES, text)
     return {"count": len(m), "matches": m}
 
 
@@ -222,6 +252,8 @@ def extract_all_patterns(text: str) -> Dict:
         "vague_attribution": detect_vague_attribution(text),
         "letter_style_formality": detect_letter_style(text),
         "leftover_chat_artifacts": detect_leftover_chat_artifacts(text),
+        "media_puffery": detect_media_puffery(text),
+        "citation_bugs": detect_citation_bugs(text),
         "em_dash_overuse": detect_em_dash_overuse(text),
         "rule_of_three": detect_rule_of_three(text),
         "formatting_overkill": detect_formatting_overkill(text),
