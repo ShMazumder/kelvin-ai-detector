@@ -73,8 +73,11 @@ function initChatDetect() {
         try {
             const resp = await fetch('/dashboard/detect', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ text, _ajax: '1' }),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
+                },
+                body: new URLSearchParams({ text }),
             });
 
             if (!resp.ok) {
