@@ -26,6 +26,9 @@ AI_VOCAB = [
     "elevate", "elevating", "unparalleled", "indelible", "ever-evolving",
     "boasts", "stands as a", "plays a vital role", "plays a crucial role",
     "serves as a testament", "rich history", "rich cultural heritage",
+    "vibrant", "align with", "garner", "meticulous", "meticulously", "interplay",
+    "profound", "exemplifies", "showcasing", "natural beauty", "nestled",
+    "in the heart of", "groundbreaking", "renowned", "diverse array", "additionally",
 ]
 
 INFLATED_SIGNIFICANCE_PHRASES = [
@@ -37,6 +40,16 @@ INFLATED_SIGNIFICANCE_PHRASES = [
     r"\bmarks? a (significant|pivotal|key) (turning point|moment)\b",
     r"\benduring legacy\b",
     r"\brich (cultural )?heritage\b",
+    r"\bis a reminder\b",
+    r"\bunderscores? (its|the) importance\b",
+    r"\bhighlights? (its|the) importance\b",
+    r"\bunderscores? (its|the) significance\b",
+    r"\bhighlights? (its|the) significance\b",
+    r"\breflects? broader\b",
+    r"\bsymboliz(e|es|ing) its (ongoing|enduring|lasting)\b",
+    r"\bsetting the stage for\b",
+    r"\bmarking the\b",
+    r"\bshaping the\b",
 ]
 
 COMPULSIVE_SUMMARY_OPENERS = [
@@ -57,6 +70,30 @@ VAGUE_ATTRIBUTION_PHRASES = [
     r"\bobservers have (noted|argued|said)\b",
     r"\bmany (believe|argue|say)\b",
     r"\bexperts (say|agree|believe)\b",
+    r"\bindustry reports?\b",
+    r"\bseveral sources\b",
+]
+
+KNOWLEDGE_DISCLAIMER_PHRASES = [
+    r"\bas of (?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b",
+    r"\bup to my last training update\b",
+    r"\bas of my last knowledge update\b",
+    r"\bnot widely (?:available|documented|disclosed)\b",
+    r"\bbased on available information\b",
+    r"\bin the provided sources\b",
+    r"\bwhile specific details are (?:limited|scarce)\b",
+]
+
+UTM_PARAMETER_PHRASES = [
+    r"\butm_source=(?:openai|chatgpt\.com|copilot\.com)\b",
+    r"\breferrer=grok\.com\b",
+]
+
+PUA_CITATION_ARTIFACTS = [
+    r"\bturn0search\d+\b",
+    r"\bturn0image\d+\b",
+    r"【\d+†(?:L\d+)?(?:-\d+)?】",
+    r"\[cite:\s*\d+(?:,\s*\d+)*\]",
 ]
 
 LETTER_STYLE_PHRASES = [
@@ -90,7 +127,13 @@ CITATION_BUG_PHRASES = [
     r"\bgrok_card\b",
 ]
 
-NEGATIVE_PARALLELISM_PATTERN = r"\bit'?s not (?:just )?[\w\s]{2,40}?, it'?s [\w\s]{2,40}"
+NEGATIVE_PARALLELISM_PATTERNS = [
+    r"\bit'?s not (?:just )?[\w\s']{2,40}?, it'?s [\w\s']{2,40}",
+    r"\bnot (?:only|just) [\w\s']{2,40}? but (?:also )?[\w\s']{2,40}",
+    r"\b[\w\s']{2,30}? rather than [\w\s']{2,30}\b",
+    r"\bnot [\w\s']{2,30}? but (?:rather )?[\w\s']{2,30}\b",
+    r"\bno [\w\s']{2,30}?, no [\w\s']{2,30}?, just [\w\s']{2,30}\b",
+]
 FALSE_RANGE_PATTERN = r"\bfrom [\w\s]{2,30}? to [\w\s]{2,30}?(?=[.,;])"
 
 # ── Pattern weights (max points each pattern can contribute) ───────────────────
@@ -110,17 +153,27 @@ PATTERN_WEIGHTS = {
     "formatting_overkill": 6,
     "media_puffery": 10,
     "citation_bugs": 14,
+    "curly_quotes": 8,
+    "markdown_leak": 10,
+    "collective_we": 6,
+    "copulative_avoidance": 8,
+    "pua_citation_bugs": 15,
+    "knowledge_cutoff_disclaimers": 10,
+    "utm_parameters": 16,
 }
 
 # Minimum floor points if ANY match found (dead-giveaway patterns)
 PATTERN_FLOORS = {
     "editorializing": 8,
-    "leftover_chat_artifacts": 12,
+    "leftover_chat_artifacts": 25,  # immediate possibly-AI threshold
     "letter_style_formality": 6,
     "inflated_significance": 6,
     "vague_attribution": 5,
     "compulsive_summary": 5,
     "citation_bugs": 10,
+    "markdown_leak": 8,
+    "pua_citation_bugs": 25,  # immediate possibly-AI threshold
+    "utm_parameters": 25,  # immediate possibly-AI threshold
 }
 
 
@@ -148,8 +201,8 @@ def detect_inflated_significance(text: str) -> Dict:
 
 
 def detect_negative_parallelism(text: str) -> Dict:
-    spans = re.findall(NEGATIVE_PARALLELISM_PATTERN, text, re.IGNORECASE)
-    return {"count": len(spans), "matches": [s.strip() for s in spans][:10]}
+    m = _find_all(NEGATIVE_PARALLELISM_PATTERNS, text)
+    return {"count": len(m), "matches": m}
 
 
 def detect_false_ranges(text: str) -> Dict:
@@ -200,10 +253,61 @@ def detect_em_dash_overuse(text: str) -> Dict:
 
 
 def detect_rule_of_three(text: str) -> Dict:
-    pattern = r"\b(\w+),\s+(\w+),?\s+and\s+(\w+)\b"
-    matches = re.findall(pattern, text, re.IGNORECASE)
-    spans = re.findall(r"\b\w+,\s+\w+,?\s+and\s+\w+\b", text, re.IGNORECASE)
-    return {"count": len(matches), "matches": spans[:10]}
+    pattern = r"\b(?:[\w']+(?:\s+[\w']+){0,2}),\s+(?:[\w']+(?:\s+[\w']+){0,2}),?\s+and\s+(?:[\w']+(?:\s+[\w']+){0,2})\b"
+    spans = re.findall(pattern, text, re.IGNORECASE)
+    return {"count": len(spans), "matches": [s.strip() for s in spans][:10]}
+
+
+def detect_curly_quotes(text: str) -> Dict:
+    matches = re.findall(r"[“”‘’’]", text)
+    return {"count": len(matches), "matches": list(set(matches))}
+
+
+def detect_markdown_leak(text: str) -> Dict:
+    markdown_link = r"\[[^\]\n]{2,80}\]\(https?://[^\s)]+\)"
+    markdown_heading = r"(?m)^\s*#{2,4}\s+[^\n]+$"
+    code_block = r"```\w*"
+    links = re.findall(markdown_link, text)
+    headings = re.findall(markdown_heading, text)
+    blocks = re.findall(code_block, text)
+    matches = links + headings + [b.strip() for b in blocks]
+    return {"count": len(matches), "matches": matches[:10]}
+
+
+def detect_collective_we(text: str) -> Dict:
+    we_patterns = [
+        r"\bas we (?:explore|examine|delve|navigate|see|look|discuss)\b",
+        r"\blet us (?:explore|explore|examine|delve|navigate|see|look|discuss)\b",
+        r"\bin this (?:section|chapter|article|essay) we\b",
+    ]
+    m = _find_all(we_patterns, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_copulative_avoidance(text: str) -> Dict:
+    cop_patterns = [
+        r"\bserves? as\b",
+        r"\bstands? as\b",
+        r"\brefers? to\b",
+        r"\brepresents?\b",
+    ]
+    m = _find_all(cop_patterns, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_knowledge_cutoff_disclaimers(text: str) -> Dict:
+    m = _find_all(KNOWLEDGE_DISCLAIMER_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_utm_parameters(text: str) -> Dict:
+    m = _find_all(UTM_PARAMETER_PHRASES, text)
+    return {"count": len(m), "matches": m}
+
+
+def detect_pua_citation_bugs(text: str) -> Dict:
+    m = _find_all(PUA_CITATION_ARTIFACTS, text)
+    return {"count": len(m), "matches": m}
 
 
 def detect_formatting_overkill(text: str) -> Dict:
@@ -259,6 +363,13 @@ def extract_all_patterns(text: str) -> Dict:
         "formatting_overkill": detect_formatting_overkill(text),
         "burstiness": detect_burstiness(text),
         "lexical_diversity": detect_lexical_diversity(text),
+        "curly_quotes": detect_curly_quotes(text),
+        "markdown_leak": detect_markdown_leak(text),
+        "collective_we": detect_collective_we(text),
+        "copulative_avoidance": detect_copulative_avoidance(text),
+        "pua_citation_bugs": detect_pua_citation_bugs(text),
+        "knowledge_cutoff_disclaimers": detect_knowledge_cutoff_disclaimers(text),
+        "utm_parameters": detect_utm_parameters(text),
     }
 
 
