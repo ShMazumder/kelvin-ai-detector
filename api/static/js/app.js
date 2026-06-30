@@ -309,6 +309,12 @@ const PATTERN_COLORS = {
     pua_citation_bugs:       '#a21caf',  // magenta-alt
     knowledge_cutoff_disclaimers:'#b45309', // dark amber
     utm_parameters:          '#991b1b',  // dark red
+    // ── Wikipedia & General AI tells (v3) ──
+    lead_proper_noun:        '#ea580c',  // dark orange
+    thematic_break_headings: '#4f46e5',  // indigo
+    skipped_headings:        '#db2777',  // dark pink
+    consecutive_sentence_starters:'#06b6d4', // cyan
+    list_item_sentence_count_uniformity:'#64748b', // gray (not highlightable)
     _default:               '#94a3b8',   // slate
 };
 

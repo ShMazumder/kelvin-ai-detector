@@ -5,7 +5,7 @@ A full-stack AI-generated text detection system with a REST API, admin panel, an
 ## Features
 
 ### Detection Engine
-- **Heuristic Analysis** — Pattern matching for 50+ AI writing markers (filler phrases, hedging, overused transitions, vocabulary uniformity, sentence rhythm)
+- **Heuristic Analysis** — Pattern matching for 55+ AI writing markers (including Wikipedia's "Signs of AI writing" guidelines like proper-noun list leads, horizontal rule headers, skipped headings; and general tells like consecutive sentence starters, list item uniformity, filler phrases, hedging, overused transitions, vocabulary uniformity, and sentence rhythm)
 - **Optional ML Layer** — Loads a trained classifier if model files are present; gracefully falls back to heuristic-only mode
 - **Scoring** — 0-100 AI probability score with verdicts: *Likely Human*, *Possibly AI-assisted*, *Likely AI-generated*
 
