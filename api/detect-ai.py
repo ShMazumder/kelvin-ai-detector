@@ -790,5 +790,6 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
-    logger.info(f"Starting Kelvin AI Detector on {host}:{port}")
-    uvicorn.run("detect-ai:app", host=host, port=port, reload=True, log_level="info")
+    reload = os.environ.get("RELOAD", "false").lower() == "true"
+    logger.info(f"Starting Kelvin AI Detector on {host}:{port} (reload={reload})")
+    uvicorn.run("detect-ai:app", host=host, port=port, reload=reload, log_level="info")
