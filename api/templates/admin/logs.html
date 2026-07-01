@@ -29,7 +29,7 @@
             </thead>
             <tbody>
                 {% for log in logs %}
-                <tr>
+                <tr class="clickable-row" onclick="showLogDetails({{ log.id }})">
                     <td class="text-mono text-sm">{{ log.id }}</td>
                     <td class="text-sm">{{ log.user_email }}</td>
                     <td>

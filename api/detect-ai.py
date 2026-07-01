@@ -647,6 +647,33 @@ async def user_usage_page(request: Request, db: Session = Depends(get_db_session
     return _render(request, db, "user/usage.html", logs=logs, total=total, total_cost=total_cost)
 
 
+@app.get("/dashboard/usage/{log_id}")
+async def web_get_log_details(log_id: int, request: Request, db: Session = Depends(get_db_session)):
+    user = get_current_web_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    log = db.query(DetectionLog).filter(DetectionLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+    if log.user_id != user.id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
+    try:
+        details = json.loads(log.output_json)
+    except Exception:
+        details = {}
+    return {
+        "id": log.id,
+        "input_text": log.input_text,
+        "score": log.score,
+        "verdict": log.verdict,
+        "model_used": log.model_used,
+        "cost": log.cost,
+        "word_count": log.word_count,
+        "created_at": log.created_at.isoformat() if log.created_at else None,
+        "details": details
+    }
+
+
 @app.get("/dashboard/topup", response_class=HTMLResponse)
 async def user_topup_page(request: Request, db: Session = Depends(get_db_session)):
     user = _require_web_user(request, db)

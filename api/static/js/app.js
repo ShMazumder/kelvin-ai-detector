@@ -416,6 +416,154 @@ function copyResult(btn) {
 }
 
 
+// ── Details Modal Operations ───────────────────────────────────────────────
+
+async function showLogDetails(logId) {
+    const modal = document.getElementById('details-modal');
+    const content = document.getElementById('modal-body-content');
+    if (!modal || !content) return;
+
+    // Show loading state
+    content.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-secondary);">⏳ Fetching details...</div>';
+    modal.style.display = 'flex';
+
+    try {
+        const resp = await fetch(`/dashboard/usage/${logId}`);
+        if (!resp.ok) {
+            throw new Error(await resp.text() || 'Failed to fetch details');
+        }
+        const data = await resp.json();
+        
+        // Reconstruct a result object compatible with result-card renderer
+        const result = {
+            final_score: data.score,
+            final_verdict: data.verdict,
+            model_used: data.model_used,
+            word_count: data.word_count,
+            processing_time_ms: data.details.processing_time_ms || '—',
+            sentence_count: data.details.sentence_count || '—',
+            detected_patterns: data.details.detected_patterns || {},
+            pattern_examples: data.details.pattern_examples || {},
+            disclaimer: data.details.disclaimer || 'Style diagnostic only — not proof of authorship.'
+        };
+
+        const score = result.final_score;
+        const scoreClass = getScoreClass(score);
+        const patterns = result.detected_patterns;
+        const examples = result.pattern_examples;
+
+        // SVG gauge ring
+        const radius = 48;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (score / 100) * circumference;
+
+        const verdictIcon = score >= 55 ? '🤖' : score >= 25 ? '⚠️' : '✅';
+        const verdictText = result.final_verdict || 'Unknown';
+
+        // Build patterns HTML
+        let patternsHtml = '';
+        const sortedPatterns = Object.entries(patterns).sort((a, b) => b[1] - a[1]);
+        if (sortedPatterns.length > 0) {
+            patternsHtml = '<div class="patterns-section" style="margin-top:20px;"><div class="patterns-title">Detected Patterns</div>';
+            for (const [name, pts] of sortedPatterns) {
+                const label = name.replace(/_/g, ' ');
+                const barPct = Math.min((pts / 20) * 100, 100);
+                const color = PATTERN_COLORS[name] || PATTERN_COLORS._default;
+                patternsHtml += `
+                    <div class="pattern-bar-item">
+                        <div class="pattern-bar-header">
+                            <span class="pattern-bar-name"><span class="pattern-color-dot" style="background:${color}"></span>${label}</span>
+                            <span class="pattern-bar-score">${pts.toFixed(1)} pts</span>
+                        </div>
+                        <div class="pattern-bar-track">
+                            <div class="pattern-bar-fill" style="width: ${barPct}%; background:${color}"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            patternsHtml += '</div>';
+        } else {
+            patternsHtml = '<div class="no-patterns" style="margin-top:20px;">No AI patterns detected</div>';
+        }
+
+        // Highlight original text
+        const highlightedHtml = buildHighlightedText(data.input_text || '', examples, patterns);
+
+        // Render card
+        content.innerHTML = `
+            <div class="result-card" style="box-shadow:none; border:none; padding:0; background:transparent;">
+                <div class="result-two-col">
+                    <!-- Left: Score & Patterns -->
+                    <div class="result-col-score">
+                        <div class="gauge-wrapper">
+                            <svg class="gauge-svg" viewBox="0 0 120 120">
+                                <circle class="gauge-bg" cx="60" cy="60" r="${radius}"/>
+                                <circle class="gauge-fill ${scoreClass}" cx="60" cy="60" r="${radius}"
+                                    stroke-dasharray="${circumference}"
+                                    stroke-dashoffset="${offset}"/>
+                            </svg>
+                            <div class="gauge-label">
+                                <div class="gauge-score ${scoreClass}">${score}</div>
+                                <div class="gauge-max">/ 100</div>
+                            </div>
+                        </div>
+
+                        <div class="verdict-badge ${scoreClass}">
+                            <span class="verdict-icon">${verdictIcon}</span>
+                            ${verdictText}
+                        </div>
+
+                        <div class="result-stats">
+                            <div class="result-stat">
+                                <div class="result-stat-value">${result.word_count}</div>
+                                <div class="result-stat-label">Words</div>
+                            </div>
+                            <div class="result-stat">
+                                <div class="result-stat-value">${result.sentence_count}</div>
+                                <div class="result-stat-label">Sentences</div>
+                            </div>
+                            <div class="result-stat">
+                                <div class="result-stat-value">${result.processing_time_ms}ms</div>
+                                <div class="result-stat-label">Speed</div>
+                            </div>
+                        </div>
+
+                        ${patternsHtml}
+                    </div>
+
+                    <!-- Right: Highlighted Text -->
+                    <div class="result-col-text">
+                        <div class="highlighted-text-header">
+                            <span class="highlighted-text-title">Your Text — Highlighted</span>
+                        </div>
+                        <div class="highlighted-text-body" style="max-height: 400px; overflow-y: auto;">${highlightedHtml}</div>
+                        <div class="highlight-legend">${buildLegendHtml(examples, patterns)}</div>
+                    </div>
+                </div>
+
+                <div class="result-disclaimer" style="margin-top:20px;">${result.disclaimer}</div>
+            </div>
+        `;
+    } catch (err) {
+        content.innerHTML = `<div style="color:var(--red); text-align:center; padding:40px;">⚠️ Error: ${err.message}</div>`;
+    }
+}
+
+function closeDetailsModal() {
+    const modal = document.getElementById('details-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+// Close modal on escape key or clicking backdrop
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDetailsModal();
+});
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('details-modal');
+    if (e.target === modal) closeDetailsModal();
+});
+
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;

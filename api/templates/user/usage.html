@@ -27,7 +27,7 @@
             </thead>
             <tbody>
                 {% for log in logs %}
-                <tr>
+                <tr class="clickable-row" onclick="showLogDetails({{ log.id }})">
                     <td>
                         <span class="badge {% if log.score and log.score >= 60 %}badge-red{% elif log.score and log.score >= 30 %}badge-yellow{% else %}badge-green{% endif %}">
                             {{ log.score | round(1) if log.score else '—' }}
