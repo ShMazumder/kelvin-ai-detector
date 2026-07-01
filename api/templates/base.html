@@ -101,7 +101,12 @@
         <div class="modal-content-wrapper">
             <div class="modal-header">
                 <h3>Detection Analysis Details</h3>
-                <button class="modal-close-btn" onclick="closeDetailsModal()">&times;</button>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button class="btn btn-secondary btn-sm" onclick="printModalResult()" style="padding: 4px 10px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-medium); color: var(--text-primary); border-radius: var(--radius-sm); cursor: pointer;">
+                        🖨️ Print
+                    </button>
+                    <button class="modal-close-btn" onclick="closeDetailsModal()">&times;</button>
+                </div>
             </div>
             <div class="modal-body" id="modal-body-content"></div>
         </div>

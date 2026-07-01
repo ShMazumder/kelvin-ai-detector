@@ -218,7 +218,10 @@ function addResultBubble(result, originalText) {
         <div class="result-card">
             <div class="result-card-header">
                 <div class="bubble-label">Kelvin Analysis</div>
-                <div class="result-card-actions">
+                <div class="result-card-actions" style="display: flex; gap: 8px;">
+                    <button class="result-action-btn" onclick="printResult(this)" title="Print analysis report">
+                        🖨️ Print
+                    </button>
                     <button class="result-action-btn" onclick="copyResult(this)" data-copy="${escapeAttr(copyText)}" title="Copy result summary">
                         📋 Copy
                     </button>
@@ -245,6 +248,10 @@ function addResultBubble(result, originalText) {
                     <div class="verdict-badge ${scoreClass}">
                         <span class="verdict-icon">${verdictIcon}</span>
                         ${verdictText}
+                    </div>
+
+                    <div class="model-badge" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; font-weight: 500; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: var(--radius-sm); display: inline-block;">
+                        Model: <span style="color: var(--text-primary); font-weight: 600;">${result.model_used}</span>
                     </div>
 
                     <div class="result-stats">
@@ -439,6 +446,279 @@ function copyResult(btn) {
 }
 
 
+function printResult(btn) {
+    const card = btn.closest('.result-card');
+    if (card) {
+        printCard(card);
+    }
+}
+
+function printModalResult() {
+    const content = document.getElementById('modal-body-content');
+    if (!content) return;
+    const card = content.querySelector('.result-card');
+    if (card) {
+        printCard(card);
+    }
+}
+
+function printCard(card) {
+    const scoreVal = card.querySelector('.gauge-score') ? card.querySelector('.gauge-score').textContent : '—';
+    const verdictEl = card.querySelector('.verdict-badge');
+    const verdictHtml = verdictEl ? verdictEl.innerHTML : '';
+    const modelEl = card.querySelector('.model-badge');
+    const modelHtml = modelEl ? modelEl.innerHTML : '';
+    
+    const statsEl = card.querySelector('.result-stats');
+    const statsHtml = statsEl ? statsEl.outerHTML : '';
+    
+    const breakdownEl = card.querySelector('.model-scores-section');
+    const breakdownHtml = breakdownEl ? breakdownEl.outerHTML : '';
+    
+    const patternsEl = card.querySelector('.patterns-section');
+    const patternsHtml = patternsEl ? patternsEl.outerHTML : '';
+    
+    const textEl = card.querySelector('.highlighted-text-body');
+    const textHtml = textEl ? textEl.outerHTML : '';
+    
+    const legendEl = card.querySelector('.highlight-legend');
+    const legendHtml = legendEl ? legendEl.outerHTML : '';
+
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+        <html>
+        <head>
+            <title>Kelvin AI Detection Report</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #1f2937;
+                    max-width: 800px;
+                    margin: 40px auto;
+                    padding: 0 20px;
+                }
+                .header {
+                    border-bottom: 2px solid #e5e7eb;
+                    padding-bottom: 15px;
+                    margin-bottom: 25px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .title {
+                    font-size: 24px;
+                    font-weight: 800;
+                    color: #111827;
+                    margin: 0;
+                }
+                .date {
+                    font-size: 14px;
+                    color: #6b7280;
+                }
+                .summary-box {
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 12px;
+                    padding: 24px;
+                    margin-bottom: 25px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+                .score-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 24px;
+                }
+                .score-large {
+                    font-size: 42px;
+                    font-weight: 900;
+                    color: #e11d48;
+                    border: 3px solid #e11d48;
+                    border-radius: 50%;
+                    width: 90px;
+                    height: 90px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .verdict-badge {
+                    font-size: 18px;
+                    font-weight: 700;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .model-badge {
+                    font-size: 14px;
+                    color: #4b5563;
+                    margin-top: 4px;
+                }
+                .result-stats {
+                    display: flex;
+                    gap: 24px;
+                    border-top: 1px solid #e5e7eb;
+                    padding-top: 16px;
+                }
+                .result-stat {
+                    display: flex;
+                    flex-direction: column;
+                }
+                .result-stat-value {
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: #111827;
+                }
+                .result-stat-label {
+                    font-size: 12px;
+                    color: #6b7280;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+                .section-title {
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #374151;
+                    border-bottom: 2px solid #f3f4f6;
+                    padding-bottom: 8px;
+                    margin-top: 30px;
+                    margin-bottom: 16px;
+                }
+                .highlighted-text-body {
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    padding: 20px;
+                    border-radius: 8px;
+                    white-space: pre-wrap;
+                    font-size: 15px;
+                    color: #374151;
+                }
+                mark {
+                    background-color: var(--ht-color, #ffe4e6);
+                    border-bottom: 2px solid rgba(0,0,0,0.1);
+                    padding: 2px 4px;
+                    border-radius: 3px;
+                    color: #111827;
+                }
+                .model-scores-section {
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    padding: 16px;
+                }
+                .patterns-section {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+                .patterns-title {
+                    display: none;
+                }
+                .pattern-bar-item {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                .pattern-bar-header {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 14px;
+                }
+                .pattern-bar-track {
+                    height: 8px;
+                    background: #f3f4f6;
+                    border-radius: 4px;
+                }
+                .pattern-bar-fill {
+                    height: 100%;
+                    border-radius: 4px;
+                }
+                .highlight-legend {
+                    margin-top: 16px;
+                    font-size: 12px;
+                    color: #6b7280;
+                }
+                .legend-item {
+                    display: inline-flex;
+                    align-items: center;
+                    margin-right: 16px;
+                }
+                .legend-dot {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 50%;
+                    margin-right: 6px;
+                }
+                .print-actions {
+                    margin-top: 40px;
+                    display: flex;
+                    justify-content: center;
+                }
+                .print-btn {
+                    padding: 12px 24px;
+                    font-size: 16px;
+                    background: #2563eb;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 700;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                    transition: background 0.2s;
+                }
+                .print-btn:hover {
+                    background: #1d4ed8;
+                }
+                @media print {
+                    body {
+                        margin: 0;
+                        padding: 0;
+                        max-width: 100%;
+                    }
+                    .print-actions {
+                        display: none;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1 class="title">🔍 Kelvin AI Detection Report</h1>
+                <div class="date">${new Date().toLocaleString()}</div>
+            </div>
+            
+            <div class="summary-box">
+                <div class="score-row">
+                    <div class="score-large">${scoreVal}</div>
+                    <div>
+                        <div class="verdict-badge">${verdictHtml}</div>
+                        <div class="model-badge">${modelHtml}</div>
+                    </div>
+                </div>
+                ${statsHtml}
+            </div>
+
+            ${breakdownHtml ? `<div><h3 class="section-title">Model Breakdown</h3>${breakdownHtml}</div>` : ''}
+            
+            ${patternsHtml ? `<div><h3 class="section-title">Detected Patterns</h3>${patternsHtml}</div>` : ''}
+
+            <div>
+                <h3 class="section-title">Analyzed Text</h3>
+                ${textHtml}
+                ${legendHtml}
+            </div>
+
+            <div class="print-actions">
+                <button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
+            </div>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+}
+
+
 // ── Details Modal Operations ───────────────────────────────────────────────
 
 async function showLogDetails(logId) {
@@ -553,6 +833,10 @@ async function showLogDetails(logId) {
                         <div class="verdict-badge ${scoreClass}">
                             <span class="verdict-icon">${verdictIcon}</span>
                             ${verdictText}
+                        </div>
+
+                        <div class="model-badge" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; font-weight: 500; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: var(--radius-sm); display: inline-block;">
+                            Model: <span style="color: var(--text-primary); font-weight: 600;">${result.model_used}</span>
                         </div>
 
                         <div class="result-stats">
