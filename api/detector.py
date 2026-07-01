@@ -14,6 +14,37 @@ import statistics
 import pickle
 from typing import Dict, List, Optional, Any
 
+try:
+    from sklearn.base import BaseEstimator, TransformerMixin
+except ImportError:
+    class BaseEstimator: pass
+    class TransformerMixin: pass
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+class HeuristicFeatureTransformer(BaseEstimator, TransformerMixin):
+    """Turns rule-based pattern scores into numeric feature matrix."""
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        rows = []
+        for text in X:
+            result = heuristic_score(text)
+            row = [result["contributions"].get(k, 0.0) for k in PATTERN_WEIGHTS.keys()]
+            row.append(result["contributions"].get("low_sentence_variance", 0.0))
+            # Passive voice and paragraph uniformity
+            row.append(result["contributions"].get("passive_voice_overuse", 0.0))
+            row.append(result["contributions"].get("paragraph_uniformity", 0.0))
+            ttr = result["raw_patterns"]["lexical_diversity"].get("ttr") or 0.0
+            row.append(ttr)
+            rows.append(row)
+        return np.array(rows) if np else rows
+
 # ── Reference word / phrase lists ──────────────────────────────────────────────
 
 AI_VOCAB = [
