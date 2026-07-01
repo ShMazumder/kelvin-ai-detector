@@ -107,6 +107,44 @@ curl -X POST http://localhost:8000/api/detect/batch \
 
 ---
 
+## Machine Learning Layer
+
+The detection engine uses a hybrid architecture blending heuristic scoring with an optional Machine Learning classifier (Logistic Regression on TF-IDF + heuristic features).
+
+### Training and Exporting the Model
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r api/requirements.txt
+   ```
+
+2. **Prepare dataset:**
+   Create a labeled dataset (CSV) with:
+   - A text column containing writing samples.
+   - A binary label column (`1` for AI-generated, `0` for human-written).
+
+3. **Train model:**
+   Run [export_model.py](file:///Applications/XAMPP/xamppfiles/htdocs/kelvin-ai-detector/api/export_model.py):
+   - **For Production (real data):**
+     ```bash
+     python api/export_model.py /path/to/dataset.csv text generated
+     ```
+   - **For Demo (synthetic data fallback):**
+     ```bash
+     python api/export_model.py
+     ```
+
+4. **Verify export:**
+   Picked model files will save to `api/model/`:
+   - `classifier.pkl`
+   - `vectorizer.pkl`
+   - `heuristic_transformer.pkl`
+
+5. **Load model:**
+   Restart Uvicorn / FastAPI server. The app automatically loads the ML model and blends predictions.
+
+---
+
 ## Project Structure
 
 ```
