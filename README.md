@@ -237,6 +237,26 @@ kelvin-ai-detector/
 
 ---
 
+## Future Roadmap
+
+Planned enhancements to move beyond hybrid TF-IDF + heuristic scoring:
+
+### 1. Pretrained Transformer Integration
+- Integrate PyTorch/Hugging Face pipeline to load transformer-based classifiers.
+- Recommended base models:
+  - `roberta-base-openai-detector`
+  - `Hello-SimpleAI/chatgpt-detector-roberta`
+
+### 2. Fine-Tuning Labeled Datasets
+- Train the model using large-scale community datasets:
+  - Kaggle's *LLM - Detect AI Generated Text* dataset (e.g. DAIGT V4).
+  - Hugging Face datasets like `dbrd/arxiv-ai-detection` or `artem9k/ai-text-detection-pile`.
+
+### 3. Structural Wikitext Analysis
+- Add parser for Wikipedia wikitext syntax to identify broken markup, hallucinated templates, and out-of-place categories.
+
+---
+
 ## License
 
 MIT
