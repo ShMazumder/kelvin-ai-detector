@@ -593,6 +593,9 @@ function printCard(card) {
                     white-space: pre-wrap;
                     font-size: 15px;
                     color: #374151;
+                    max-height: none !important;
+                    overflow: visible !important;
+                    overflow-y: visible !important;
                 }
                 mark {
                     background-color: var(--ht-color, #ffe4e6);
