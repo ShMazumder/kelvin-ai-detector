@@ -1,0 +1,26 @@
+# Render deployment config
+# Docs: https://docs.render.com/blueprint-spec
+
+services:
+  - type: web
+    name: kelvin-ai-detector
+    runtime: python
+    plan: free  # or "starter" ($7/mo) for always-on
+    region: singapore  # closest to your Supabase region (ap-northeast-1)
+    buildCommand: pip install -r api/requirements.txt
+    startCommand: cd api && python detect-ai.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # set manually in Render dashboard
+      - key: SECRET_KEY
+        generateValue: true  # auto-generate a secure random value
+      - key: ADMIN_EMAIL
+        value: admin@kelvin.local
+      - key: ADMIN_PASSWORD
+        sync: false  # set manually for security
+      - key: PORT
+        value: 8000
+      - key: HOST
+        value: 0.0.0.0
+    healthCheckPath: /api/health
+    autoDeploy: true  # auto-deploy on git push

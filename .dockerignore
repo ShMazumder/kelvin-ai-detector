@@ -1,0 +1,26 @@
+# Ignore local data and secrets
+api/data/
+api/.env
+supabase.txt
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Agents/tools
+.agents/
+graphify-out/
+skills-lock.json
