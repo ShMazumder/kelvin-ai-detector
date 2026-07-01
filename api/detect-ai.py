@@ -5,6 +5,9 @@ API endpoints + Web UI routes. Serves detection API with balance/rate limiting
 and full admin panel + user dashboard via Jinja2 templates.
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import sys
 import json

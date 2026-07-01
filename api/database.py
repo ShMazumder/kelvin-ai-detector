@@ -17,13 +17,12 @@ from contextlib import contextmanager
 
 # ── Database setup ─────────────────────────────────────────────────────────────
 
-_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-os.makedirs(_DATA_DIR, exist_ok=True)
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://postgres.mdlrauqniheobvevmvyu:fuhjsHCa%2AB%2BA8%2FA@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres"
+)
 
-DB_PATH = os.path.join(_DATA_DIR, "kelvin.db")
-DATABASE_URL = f"sqlite:///{DB_PATH}"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 
