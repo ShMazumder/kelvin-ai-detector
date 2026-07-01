@@ -336,10 +336,14 @@ def detect_citation_bugs(text: str) -> Dict:
 
 
 def detect_em_dash_overuse(text: str) -> Dict:
-    em_dashes = text.count("\u2014") + text.count("--")
+    matches = re.findall(r"\u2014|--", text)
     words = max(len(text.split()), 1)
-    rate_per_100w = em_dashes / words * 100
-    return {"count": em_dashes, "rate_per_100_words": round(rate_per_100w, 2)}
+    rate_per_100w = len(matches) / words * 100
+    return {
+        "count": len(matches),
+        "rate_per_100_words": round(rate_per_100w, 2),
+        "matches": list(set(matches))
+    }
 
 
 def detect_rule_of_three(text: str) -> Dict:
@@ -401,10 +405,17 @@ def detect_pua_citation_bugs(text: str) -> Dict:
 
 
 def detect_formatting_overkill(text: str) -> Dict:
-    bold_count = len(re.findall(r"\*\*[^*]+\*\*", text))
-    bullet_count = len(re.findall(r"(?m)^\s*[-*\u2022]\s+", text))
-    emoji_count = len(re.findall(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]", text))
-    return {"bold_count": bold_count, "bullet_count": bullet_count, "emoji_count": emoji_count}
+    bolds = re.findall(r"\*\*[^*]+\*\*", text)
+    bullets = re.findall(r"(?m)^\s*[-*\u2022]\s+", text)
+    emojis = re.findall(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]", text)
+    matches = bolds + bullets + emojis
+    return {
+        "count": len(matches),
+        "bold_count": len(bolds),
+        "bullet_count": len(bullets),
+        "emoji_count": len(emojis),
+        "matches": matches[:20]
+    }
 
 
 def detect_burstiness(text: str) -> Dict:

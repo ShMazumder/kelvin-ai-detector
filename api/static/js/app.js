@@ -299,6 +299,7 @@ const PATTERN_COLORS = {
     deepseek_artifacts:      '#be123c',  // crimson
     title_case_headings:     '#0d9488',  // teal
     passive_voice:           '#7c3aed',  // purple
+    passive_voice_overuse:   '#7c3aed',  // purple
     inline_header_lists:     '#2563eb',  // blue
     constructive_criticism:  '#e11d48',  // rose
     paragraph_uniformity:    '#64748b',  // gray (not highlightable)
@@ -331,7 +332,7 @@ function buildHighlightedText(text, examples, patterns) {
         const label = patternName.replace(/_/g, ' ');
 
         for (const match of matchList) {
-            if (!match || match.length < 2) continue;
+            if (!match || match.length < 1) continue;
             // Find all occurrences of this match in the text (case-insensitive)
             const lowerText = text.toLowerCase();
             const lowerMatch = match.toLowerCase();
