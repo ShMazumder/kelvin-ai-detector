@@ -70,6 +70,9 @@ function initChatDetect() {
         submitBtn.disabled = true;
         submitBtn.textContent = '⏳';
 
+        const selectEl = document.getElementById('detection-type-select');
+        const detection_type = selectEl ? selectEl.value : 'all';
+
         try {
             const resp = await fetch('/dashboard/detect', {
                 method: 'POST',
@@ -77,7 +80,7 @@ function initChatDetect() {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'Accept': 'application/json',
                 },
-                body: new URLSearchParams({ text }),
+                body: new URLSearchParams({ text, detection_type }),
             });
 
             if (!resp.ok) {
@@ -185,6 +188,24 @@ function addResultBubble(result, originalText) {
         patternsHtml = '<div class="no-patterns">No AI patterns detected</div>';
     }
 
+    // Build model scores breakdown HTML if available
+    let modelScoresHtml = '';
+    if (result.model_scores && Object.keys(result.model_scores).length > 0) {
+        modelScoresHtml = '<div class="model-scores-section" style="margin-top: 16px; text-align: left; padding: 12px; background: rgba(255,255,255,0.03); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">';
+        modelScoresHtml += '<div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.03em;">Model Breakdown</div>';
+        for (const [mName, mScore] of Object.entries(result.model_scores)) {
+            const mLabel = mName.charAt(0).toUpperCase() + mName.slice(1);
+            const subScoreClass = getScoreClass(mScore);
+            modelScoresHtml += `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.85rem;">
+                    <span style="color: var(--text-secondary);">${mLabel} Model:</span>
+                    <span class="${subScoreClass}" style="font-weight: 600;">${mScore}%</span>
+                </div>
+            `;
+        }
+        modelScoresHtml += '</div>';
+    }
+
     // Build highlighted text
     const highlightedHtml = buildHighlightedText(originalText || '', examples, patterns);
 
@@ -240,6 +261,8 @@ function addResultBubble(result, originalText) {
                             <div class="result-stat-label">Speed</div>
                         </div>
                     </div>
+
+                    ${modelScoresHtml}
 
                     ${patternsHtml}
                 </div>
@@ -444,6 +467,7 @@ async function showLogDetails(logId) {
             sentence_count: data.details.sentence_count || '—',
             detected_patterns: data.details.detected_patterns || {},
             pattern_examples: data.details.pattern_examples || {},
+            model_scores: data.details.model_scores || {},
             disclaimer: data.details.disclaimer || 'Style diagnostic only — not proof of authorship.'
         };
 
@@ -484,6 +508,24 @@ async function showLogDetails(logId) {
             patternsHtml += '</div>';
         } else {
             patternsHtml = '<div class="no-patterns" style="margin-top:20px;">No AI patterns detected</div>';
+        }
+
+        // Build model scores breakdown HTML if available
+        let modelScoresHtml = '';
+        if (result.model_scores && Object.keys(result.model_scores).length > 0) {
+            modelScoresHtml = '<div class="model-scores-section" style="margin-top: 16px; text-align: left; padding: 12px; background: rgba(255,255,255,0.03); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">';
+            modelScoresHtml += '<div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.03em;">Model Breakdown</div>';
+            for (const [mName, mScore] of Object.entries(result.model_scores)) {
+                const mLabel = mName.charAt(0).toUpperCase() + mName.slice(1);
+                const subScoreClass = getScoreClass(mScore);
+                modelScoresHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.85rem;">
+                        <span style="color: var(--text-secondary);">${mLabel} Model:</span>
+                        <span class="${subScoreClass}" style="font-weight: 600;">${mScore}%</span>
+                    </div>
+                `;
+            }
+            modelScoresHtml += '</div>';
         }
 
         // Highlight original text
@@ -527,6 +569,8 @@ async function showLogDetails(logId) {
                                 <div class="result-stat-label">Speed</div>
                             </div>
                         </div>
+
+                        ${modelScoresHtml}
 
                         ${patternsHtml}
                     </div>

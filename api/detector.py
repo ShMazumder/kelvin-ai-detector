@@ -775,8 +775,8 @@ def load_model(model_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
 
 # ── Combined predictor ────────────────────────────────────────────────────────
 
-def predict(text: str, ml_model: Optional[Dict] = None) -> Dict:
-    """Run heuristic scorer, optionally blend with ML prediction."""
+def predict(text: str, ml_models: Optional[Dict[str, Any]] = None, detection_type: str = "all") -> Dict:
+    """Run heuristic scorer, optionally blend with ML predictions from specified model type."""
     heur = heuristic_score(text)
     word_count = max(len(text.split()), 1)
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
@@ -796,27 +796,70 @@ def predict(text: str, ml_model: Optional[Dict] = None) -> Dict:
         },
     }
 
-    if ml_model is not None:
+    # Convert single ml_model dict to dict of models to preserve backward compatibility
+    models_dict = {}
+    if ml_models is not None:
+        if isinstance(ml_models, dict) and "classifier" in ml_models:
+            models_dict = {"default": ml_models}
+        elif isinstance(ml_models, dict):
+            models_dict = ml_models
+
+    model_scores = {}
+    ml_prob = None
+    model_used = "heuristic"
+
+    if models_dict:
         try:
             from scipy.sparse import hstack
 
-            tfidf_vec = ml_model["vectorizer"].transform([text])
-            heur_tf = ml_model.get("heuristic_transformer")
-            if heur_tf is not None:
-                heur_vec = heur_tf.transform([text])
+            # Helper to run a single model prediction
+            def _predict_single(model, heur_data):
+                tfidf_vec = model["vectorizer"].transform([text])
+                heur_tf = model.get("heuristic_transformer")
+                if heur_tf is not None:
+                    heur_vec = heur_tf.transform([text])
+                else:
+                    heur_vec = _build_heuristic_vector(heur_data)
+                combined_vec = hstack([tfidf_vec, heur_vec])
+                prob = float(model["classifier"].predict_proba(combined_vec)[0, 1])
+                return prob
+
+            if detection_type in ("scientific", "general", "wikipedia"):
+                model = models_dict.get(detection_type)
+                model_name = detection_type
+                if model is None:
+                    model = models_dict.get("default")
+                    model_name = "default"
+
+                if model is not None:
+                    prob = _predict_single(model, heur)
+                    ml_prob = prob * 100
+                    model_used = f"heuristic+ml ({model_name})"
             else:
-                # Inline fallback — build heuristic feature vector
-                heur_vec = _build_heuristic_vector(heur)
-            combined_vec = hstack([tfidf_vec, heur_vec])
-            ml_prob = float(ml_model["classifier"].predict_proba(combined_vec)[0, 1])
-            result["ml_probability_ai"] = round(ml_prob * 100, 1)
-            # Blend: 60% ML, 40% heuristic
-            blended = 0.6 * (ml_prob * 100) + 0.4 * heur["heuristic_score"]
-            result["final_score"] = round(blended, 1)
-            result["model_used"] = "heuristic+ml"
+                # detection_type == "all" (or unknown, default to all)
+                active_probs = []
+                for name in ("scientific", "general", "wikipedia", "default"):
+                    model = models_dict.get(name)
+                    if model is not None:
+                        prob = _predict_single(model, heur)
+                        score_pct = round(prob * 100, 1)
+                        model_scores[name] = score_pct
+                        active_probs.append(score_pct)
+
+                if active_probs:
+                    ml_prob = sum(active_probs) / len(active_probs)
+                    model_used = "heuristic+ml (blended)"
         except Exception:
-            result["final_score"] = heur["heuristic_score"]
-            result["model_used"] = "heuristic"
+            # Silently fall back to heuristic-only
+            pass
+
+    if ml_prob is not None:
+        result["ml_probability_ai"] = round(ml_prob, 1)
+        blended = 0.6 * ml_prob + 0.4 * heur["heuristic_score"]
+        result["final_score"] = round(blended, 1)
+        result["model_used"] = model_used
+        if model_scores:
+            result["model_scores"] = model_scores
     else:
         result["final_score"] = heur["heuristic_score"]
         result["model_used"] = "heuristic"

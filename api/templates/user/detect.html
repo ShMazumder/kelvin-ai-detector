@@ -73,9 +73,18 @@ Each analysis costs 1 credit. Press Ctrl+Enter or click → to submit.</div>
 
         <div class="chat-input-area">
             <form id="chat-form" method="POST" action="/dashboard/detect">
+                <div class="chat-select-wrapper" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <label for="detection-type-select" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Model Type:</label>
+                    <select id="detection-type-select" name="detection_type" class="form-select" style="width: auto; padding: 6px 12px; border-radius: var(--radius-md); font-size: 0.85rem; background: var(--bg-input); border: 1px solid var(--border-medium); color: var(--text-primary); outline: none;">
+                        <option value="all" {% if detection_type == 'all' or not detection_type %}selected{% endif %}>All Available Models (Default)</option>
+                        <option value="scientific" {% if detection_type == 'scientific' %}selected{% endif %}>Scientific / Structured Style</option>
+                        <option value="general" {% if detection_type == 'general' %}selected{% endif %}>Finance / Medicine / CS / Wiki Topic</option>
+                        <option value="wikipedia" {% if detection_type == 'wikipedia' %}selected{% endif %}>Wikipedia Style</option>
+                    </select>
+                </div>
                 <div class="chat-input-wrapper">
                     <textarea id="chat-input" name="text" placeholder="Paste text here to analyze... (Ctrl+Enter to submit)"
-                              required minlength="20" maxlength="50000"></textarea>
+                               required minlength="20" maxlength="50000"></textarea>
                     <button type="submit" id="chat-submit" class="btn btn-primary">→</button>
                 </div>
             </form>
@@ -85,54 +94,4 @@ Each analysis costs 1 credit. Press Ctrl+Enter or click → to submit.</div>
 {% endblock %}
 
 {% block scripts %}
-<script>
-// Override form to use AJAX for chat experience
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('chat-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const textarea = document.getElementById('chat-input');
-        const text = textarea.value.trim();
-        if (text.length < 20) return;
-
-        addUserMessage(text);
-        textarea.value = '';
-        textarea.style.height = 'auto';
-
-        const btn = document.getElementById('chat-submit');
-        btn.disabled = true;
-        btn.textContent = '⏳';
-
-        try {
-            const formData = new FormData();
-            formData.append('text', text);
-
-            const resp = await fetch('/dashboard/detect', {
-                method: 'POST',
-                body: formData,
-                headers: { 'Accept': 'application/json' },
-            });
-
-            // If we get redirected (HTML response), fall back
-            const ct = resp.headers.get('content-type') || '';
-            if (ct.includes('application/json')) {
-                const result = await resp.json();
-                addResultBubble(result);
-                const balEl = document.getElementById('balance-display');
-                if (balEl && result.remaining_balance !== undefined) {
-                    balEl.textContent = result.remaining_balance.toFixed(1);
-                }
-            } else {
-                // Fallback: reload page
-                window.location.reload();
-            }
-        } catch (err) {
-            addSystemMessage('Error: ' + err.message, true);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '→';
-        }
-    });
-});
-</script>
 {% endblock %}

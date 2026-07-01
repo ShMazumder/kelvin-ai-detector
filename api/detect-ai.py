@@ -46,14 +46,14 @@ logger = logging.getLogger("kelvin-ai-detector")
 
 # ── App state ──────────────────────────────────────────────────────────────────
 
-ml_model = None
+ml_models = {}
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ml_model
+    global ml_models
 
     # Init database
     init_db()
@@ -76,12 +76,22 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    # Load ML model
-    ml_model = load_model()
-    if ml_model:
-        logger.info("ML model loaded.")
+    # Load ML models from subdirectories
+    model_root = os.path.join(_BASE_DIR, "model")
+    ml_models = {
+        "scientific": load_model(os.path.join(model_root, "scientific")),
+        "general": load_model(os.path.join(model_root, "general")),
+        "wikipedia": load_model(os.path.join(model_root, "wikipedia")),
+        "default": load_model(model_root),
+    }
+
+    # Clean up empty models
+    ml_models = {k: v for k, v in ml_models.items() if v is not None}
+
+    if ml_models:
+        logger.info(f"ML models loaded: {list(ml_models.keys())}")
     else:
-        logger.info("Heuristic-only mode (no ML model found).")
+        logger.info("Heuristic-only mode (no ML models found).")
 
     yield
     logger.info("Shutting down.")
@@ -160,9 +170,11 @@ def get_current_web_user(request: Request, db: Session) -> Optional[User]:
 
 class DetectRequest(BaseModel):
     text: str = Field(..., min_length=TEXT_MIN_LENGTH, max_length=TEXT_MAX_LENGTH)
+    detection_type: str = Field(default="all")
 
 class BatchDetectRequest(BaseModel):
     texts: List[str] = Field(..., min_length=1, max_length=BATCH_MAX_SIZE)
+    detection_type: str = Field(default="all")
 
 class CreateKeyRequest(BaseModel):
     label: str = Field(..., min_length=1, max_length=100)
@@ -200,8 +212,9 @@ class AdminSetRateLimitRequest(BaseModel):
 async def health():
     return {
         "status": "ok",
-        "model_loaded": ml_model is not None,
-        "model_type": "heuristic+ml" if ml_model else "heuristic",
+        "model_loaded": len(ml_models) > 0,
+        "model_type": "heuristic+ml" if ml_models else "heuristic",
+        "loaded_models": list(ml_models.keys()),
         "version": "2.0.0",
     }
 
@@ -232,7 +245,7 @@ async def api_login(req: LoginRequest, db: Session = Depends(get_db_session)):
 
 # ── Detection ──────────────────────────────────────────────────────────────────
 
-def _do_detect(text: str, key_info: dict, db: Session, ip: str = None) -> dict:
+def _do_detect(text: str, key_info: dict, db: Session, ip: str = None, detection_type: str = "all") -> dict:
     """Core detection + logging + billing."""
     user_id = key_info["user_id"]
 
@@ -246,7 +259,7 @@ def _do_detect(text: str, key_info: dict, db: Session, ip: str = None) -> dict:
 
     # Run detection
     start = time.time()
-    result = predict(text, ml_model=ml_model)
+    result = predict(text, ml_models=ml_models, detection_type=detection_type)
     elapsed_ms = round((time.time() - start) * 1000, 1)
     result["processing_time_ms"] = elapsed_ms
 
@@ -284,7 +297,7 @@ async def detect_text(
     db: Session = Depends(get_db_session),
 ):
     ip = request.client.host if request.client else None
-    return _do_detect(req.text, key_info, db, ip)
+    return _do_detect(req.text, key_info, db, ip, detection_type=req.detection_type)
 
 
 @app.post("/api/detect/batch")
@@ -308,7 +321,7 @@ async def detect_batch(
 
     ip = request.client.host if request.client else None
     start = time.time()
-    results = [_do_detect(text, key_info, db, ip) for text in req.texts]
+    results = [_do_detect(text, key_info, db, ip, detection_type=req.detection_type) for text in req.texts]
     total_ms = round((time.time() - start) * 1000, 1)
 
     return {"count": len(results), "total_processing_time_ms": total_ms, "results": results}
@@ -598,22 +611,27 @@ async def user_dashboard(request: Request, db: Session = Depends(get_db_session)
 @app.get("/dashboard/detect", response_class=HTMLResponse)
 async def user_detect_page(request: Request, db: Session = Depends(get_db_session)):
     _require_web_user(request, db)
-    return _render(request, db, "user/detect.html")
+    return _render(request, db, "user/detect.html", detection_type="all")
 
 
 @app.post("/dashboard/detect")
-async def user_detect_submit(request: Request, text: str = Form(...), db: Session = Depends(get_db_session)):
+async def user_detect_submit(
+    request: Request,
+    text: str = Form(...),
+    detection_type: str = Form("all"),
+    db: Session = Depends(get_db_session)
+):
     user = _require_web_user(request, db)
     if len(text.strip()) < TEXT_MIN_LENGTH:
-        return _render(request, db, "user/detect.html", error=f"Text too short (min {TEXT_MIN_LENGTH} chars).")
+        return _render(request, db, "user/detect.html", error=f"Text too short (min {TEXT_MIN_LENGTH} chars).", detection_type=detection_type)
     if user.balance < COST_PER_DETECTION:
-        return _render(request, db, "user/detect.html", error="Insufficient balance.")
+        return _render(request, db, "user/detect.html", error="Insufficient balance.", detection_type=detection_type)
     key_info = {"user_id": user.id, "key_id": None, "key_hash": "web_ui", "role": user.role, "balance": user.balance, "rate_limit": 9999}
-    result = _do_detect(text, key_info, db, request.client.host if request.client else None)
+    result = _do_detect(text, key_info, db, request.client.host if request.client else None, detection_type=detection_type)
     accept = request.headers.get("accept", "")
     if "application/json" in accept:
         return JSONResponse(result)
-    return _render(request, db, "user/detect.html", result=result, input_text=text)
+    return _render(request, db, "user/detect.html", result=result, input_text=text, detection_type=detection_type)
 
 
 @app.get("/dashboard/keys", response_class=HTMLResponse)
