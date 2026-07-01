@@ -34,34 +34,10 @@ from detector import (
     PATTERN_WEIGHTS,
     heuristic_score,
     extract_all_patterns,
+    HeuristicFeatureTransformer,
 )
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
-
-
-# ── Heuristic feature transformer (same as notebook) ──────────────────────────
-
-class HeuristicFeatureTransformer(BaseEstimator, TransformerMixin):
-    """Turns rule-based pattern scores into numeric feature matrix."""
-
-    feature_keys = list(PATTERN_WEIGHTS.keys()) + [
-        "low_sentence_variance",
-        "lexical_diversity_ttr",
-    ]
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        rows = []
-        for text in X:
-            result = heuristic_score(text)
-            row = [result["contributions"].get(k, 0.0) for k in PATTERN_WEIGHTS.keys()]
-            row.append(result["contributions"].get("low_sentence_variance", 0.0))
-            ttr = result["raw_patterns"]["lexical_diversity"].get("ttr") or 0.0
-            row.append(ttr)
-            rows.append(row)
-        return np.array(rows)
 
 
 # ── Synthetic fallback dataset ────────────────────────────────────────────────
